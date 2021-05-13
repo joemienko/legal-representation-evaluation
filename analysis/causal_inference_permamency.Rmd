@@ -387,7 +387,7 @@ get_average_los(treatment_vs_control_leg) %>%
 
 # Treatment vs Control RWJ
 
-```{r treatment_vs_control_rwj}
+```{r treatment_vs_control_rwj, eval=FALSE, include=FALSE}
 treatment_vs_control_similar <- shelter_care_events_timed_filtered %>%
   filter(
     fl_treatment_counties == 1 | fl_similar_counties == 1
@@ -449,7 +449,7 @@ get_average_los(treatment_vs_control_similar) %>%
 # Treatment vs Control Propensity
 
 
-```{r propensity_model_setup}
+```{r propensity_model_setup, eval=FALSE, include=FALSE}
 
 propensity_dat <- feather::read_feather("data/propensity_dat.feather")
 
@@ -526,7 +526,7 @@ propensity_dat_full$IPTW <-propensity_dat_full$strategy_id/propensity_dat_full$p
 
 # Treatment vs IPTW
 
-```{r treatment_vs_control_iptw}
+```{r treatment_vs_control_iptw, eval=FALSE, include=FALSE}
 treatment_vs_control_similar_iptw <- shelter_care_events_timed_filtered %>%
   filter(
     fl_treatment_counties == 1 | fl_similar_counties == 1
