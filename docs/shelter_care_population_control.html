@@ -36,6 +36,8 @@
 <script src="site_libs/navigation-1.1/tabsets.js"></script>
 <link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
 <script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-5.1.0/css/all.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-5.1.0/css/v4-shims.css" rel="stylesheet" />
 
 <link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
 <!-- Add a small amount of space between sections. -->
@@ -340,7 +342,11 @@ div.tocify {
       </ul>
       <ul class="nav navbar-nav navbar-right">
         <li>
-  <a href="https://github.com/cssat/legal-representation-evaluation">source</a>
+  <a href="https://github.com/joemienko/legal-representation-evaluation">
+    <span class="fas fa-github"></span>
+     
+    Source code
+  </a>
 </li>
       </ul>
     </div><!--/.nav-collapse -->
@@ -616,16 +622,16 @@ data/person_ids_and_covariates.feather
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong1832f40"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 1832f40 </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrongahrefhttpsgithubcomjoemienkolegalrepresentationevaluationtree5c0d5d4469c3680026b1941626739abb9305e7actargetblank5c0d5d4a"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> <a href="https://github.com/joemienko/legal-representation-evaluation/tree/5c0d5d4469c3680026b1941626739abb9305e7ac" target="_blank">5c0d5d4</a> </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrong1832f40" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrongahrefhttpsgithubcomjoemienkolegalrepresentationevaluationtree5c0d5d4469c3680026b1941626739abb9305e7actargetblank5c0d5d4a" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
 </p>
 <p>
-The results in this page were generated with repository version 1832f40. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+The results in this page were generated with repository version <a href="https://github.com/joemienko/legal-representation-evaluation/tree/5c0d5d4469c3680026b1941626739abb9305e7ac" target="_blank">5c0d5d4</a>. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
 </p>
 <p>
 Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
@@ -639,59 +645,25 @@ Ignored files:
     Ignored:    analysis/.DS_Store
     Ignored:    analysis/data_import_cache/
     Ignored:    analysis/data_wrangling_cache/
+    Ignored:    analysis/figure/
     Ignored:    analysis/prop_model_XG.rds
     Ignored:    analysis/shelter_care_population_cache/
     Ignored:    analysis/shelter_care_population_control_cache/
     Ignored:    code/.DS_Store
     Ignored:    code/SQL/
     Ignored:    cost_briefing_cache/
-    Ignored:    data/aoc/CCRD codebook.xlsx
-    Ignored:    data/aoc/ccrd.csv
-    Ignored:    data/aoc/ccrd.sas7bdat
-    Ignored:    data/aoc/ccrd.sav
-    Ignored:    data/aoc/dep_case.sas7bdat
-    Ignored:    data/aoc/dep_case.sav
-    Ignored:    data/aoc/dep_case_docket.sas7bdat
-    Ignored:    data/aoc/dep_case_docket.sav
-    Ignored:    data/aoc/dep_case_participant.sas7bdat
-    Ignored:    data/aoc/dep_case_participant.sav
-    Ignored:    data/aoc/famlink.sas7bdat
-    Ignored:    data/ospi/Absence_2013-19.txt
-    Ignored:    data/ospi/Absence_2013-19.txt.zip
-    Ignored:    data/ospi/Discipline_2014-19.txt
-    Ignored:    data/ospi/Discipline_2014-19.txt.zip
-    Ignored:    data/ospi/DistrictLevelPrograms_2010-19.txt
-    Ignored:    data/ospi/DistrictLevelPrograms_2010-19.txt.zip
-    Ignored:    data/ospi/EnrollDemographic_2010-19.txt
-    Ignored:    data/ospi/EnrollDemographic_2010-19.txt.zip
-    Ignored:    data/ospi/FreeReducedLunch_2010-19.txt
-    Ignored:    data/ospi/FreeReducedLunch_2010-19.txt.zip
-    Ignored:    data/ospi/SGPBase_2012-19.txt
-    Ignored:    data/ospi/SGPBase_2012-19.txt.zip
-    Ignored:    data/ospi/SGPCEDARS_2012-19.txt
-    Ignored:    data/ospi/SGPCEDARS_2012-19.txt.zip
-    Ignored:    data/ospi/SchoolLevelPrograms_2010-19.txt
-    Ignored:    data/ospi/SchoolLevelPrograms_2010-19.txt.zip
-    Ignored:    data/ospi/SpecialEducation_2010-19.txt
-    Ignored:    data/ospi/SpecialEducation_2010-19.txt.zip
-    Ignored:    data/ospi/WaKIDSBase_2012-19.txt
-    Ignored:    data/ospi/WaKIDSBase_2012-19.txt.zip
-    Ignored:    data/ospi/WaKIDSCEDARS_2012-19.txt
-    Ignored:    data/ospi/WaKIDSCEDARS_2012-19.txt.zip
-    Ignored:    data/ospi/WaKIDSSubscores_2012-19.txt
-    Ignored:    data/ospi/WaKIDSSubscores_2012-19.txt.zip
-
-Unstaged changes:
-    Modified:   data/child_birthday_18.feather
-    Modified:   data/child_dependency_episode.feather
-    Modified:   data/dependency_end_events.feather
-    Modified:   data/dependency_start_events.feather
-    Modified:   data/person_ids_and_covariates.feather
-    Modified:   data/petition_dismissal_events.feather
-    Modified:   data/propensity_dat.feather
-    Modified:   data/removal_episode_ends.feather
-    Modified:   data/removal_episode_starts.feather
-    Modified:   data/shelter_care_events.feather
+    Ignored:    data/case_jurisdiction.feather
+    Ignored:    data/child_birthday_18.feather
+    Ignored:    data/child_dependency_episode.feather
+    Ignored:    data/dependency_end_events.feather
+    Ignored:    data/dependency_start_events.feather
+    Ignored:    data/filing_events.feather
+    Ignored:    data/person_ids_and_covariates.feather
+    Ignored:    data/petition_dismissal_events.feather
+    Ignored:    data/removal_episode_ends.feather
+    Ignored:    data/removal_episode_starts.feather
+    Ignored:    data/shelter_care_events.feather
+    Ignored:    data/termination_cases.feather
 
 </code></pre>
 <p>
@@ -732,10 +704,27 @@ Message
 <tbody>
 <tr>
 <td>
+html
+</td>
+<td>
+<a href="https://rawcdn.githack.com/joemienko/legal-representation-evaluation/fe9ee91e0724564a0f997f9bd59ef27093e16e08/docs/shelter_care_population_control.html" target="_blank">fe9ee91</a>
+</td>
+<td>
+joemienko
+</td>
+<td>
+2021-05-13
+</td>
+<td>
+init fixes
+</td>
+</tr>
+<tr>
+<td>
 Rmd
 </td>
 <td>
-ae01899
+<a href="https://github.com/joemienko/legal-representation-evaluation/blob/ae018995e99fe4f4db4eae5ae2afa46dbce0d810/analysis/shelter_care_population_control.Rmd" target="_blank">ae01899</a>
 </td>
 <td>
 joemienko
@@ -752,7 +741,7 @@ initial commmit
 html
 </td>
 <td>
-ae01899
+<a href="https://rawcdn.githack.com/joemienko/legal-representation-evaluation/ae018995e99fe4f4db4eae5ae2afa46dbce0d810/docs/shelter_care_population_control.html" target="_blank">ae01899</a>
 </td>
 <td>
 joemienko

@@ -23,14 +23,14 @@ After you have the [setup](setup.html) tasks completed, you will need to perform
 
 2. [Wrangle the data](data_wrangling.html)
 
-3. [Exploring daily bike commuting trends from the Divvy
-data.](time-of-day-trends.html)
+3. [Build treatment population](shelter_care_population.html)
 
-4. [Exploring seasonal biking trends from the Divvy
-data.](seasonal-trends.html)
+4. [Build control population](shelter_care_population_control.html)
 
 ## Credits
 
 This workflowr project was developed by Joe Mienko at the [University of
-Washington](https://www.uw.edu).
+Washington](https://www.uw.edu). Please contact <mienko@uw.edu> for questions. 
+
+
 
