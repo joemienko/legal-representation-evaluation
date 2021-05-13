@@ -28,4 +28,8 @@ CENSUS_API_KEY=<add CENSUS API KEY HERE>
 
 NOTE: Census API Keys can be obtained for free from [here](https://api.census.gov/data/key_signup.html). 
 
+3. Contact Joe Mienko <mienko@uw.edu> for access to the OSPI and AOC data used in this project.
+
+4. Add the AOC and OSPI raw data to the `data/aoc` and `data/ospi` directories you downloaded from the [git repository](https://github.com/cssat/legal-representation-evaluation). 
+
 
