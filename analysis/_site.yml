@@ -14,7 +14,7 @@ navbar:
   right:
   - icon: fa-github
     text: Source code
-    href: https://github.com/cssat/legal-representation-evaluation
+    href: https://github.com/joemienko/legal-representation-evaluation
 output:
   workflowr::wflow_html:
     toc: yes
