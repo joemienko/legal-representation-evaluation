@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Causal Inference</title>
+
+<script src="site_libs/header-attrs-2.6.6/header-attrs.js"></script>
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/readable.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.tab('show');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-sm-12 col-md-4 col-lg-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-sm-12 col-md-8 col-lg-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">Dependent Child Legal Representation Evaluation</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Overview</a>
+</li>
+<li>
+  <a href="setup.html">Setup</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/cssat/legal-representation-evaluation">source</a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Causal Inference</h1>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span> workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2021-05-13
+</p>
+<p>
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 5 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 2
+</p>
+<p>
+<strong>Knit directory:</strong> <code>legal-representation-evaluation/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
+</p>
+<p>
+This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.2). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R Markdown file created these results, you’ll want to first commit it to the Git repo. If you’re still working on the analysis, you can ignore this warning. When you’re finished, you can run <code>wflow_publish</code> to commit the R Markdown file and build the HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the global environment can affect the analysis in your R Markdown file in unknown ways. For reproduciblity it’s best to always run the code in an empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20210213code"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Seed:</strong> <code>set.seed(20210213)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20210213code" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20210213)</code> was run prior to running the code in the R Markdown file. Setting a seed ensures that any results that rely on randomness, e.g. subsampling or permutations, are reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Session information:</strong> recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongnone"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Cache:</strong> none </a>
+</p>
+</div>
+<div id="strongCachestrongnone" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Nice! There were no cached chunks for this analysis, so you can be confident that you successfully produced the results during this run.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongabsolute"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>File paths:</strong> absolute </a>
+</p>
+</div>
+<div id="strongFilepathsstrongabsolute" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Using absolute paths to the files within your workflowr project makes it difficult for you and others to run your code on a different machine. Change the absolute path(s) below to the suggested relative path(s) to make your code more reproducible.
+</p>
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th style="text-align:left;">
+absolute
+</th>
+<th style="text-align:left;">
+relative
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/shelter_care_events_timed_filtered.feather
+</td>
+<td style="text-align:left;">
+data/shelter_care_events_timed_filtered.feather
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong6c1d2a4"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 6c1d2a4 </a>
+</p>
+</div>
+<div id="strongRepositoryversionstrong6c1d2a4" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version 6c1d2a4. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    .env
+    Ignored:    analysis/.DS_Store
+    Ignored:    analysis/data_import_cache/
+    Ignored:    analysis/data_wrangling_cache/
+    Ignored:    analysis/shelter_care_population_cache/
+    Ignored:    analysis/shelter_care_population_control_cache/
+    Ignored:    code/.DS_Store
+    Ignored:    code/SQL/
+    Ignored:    cost_briefing_cache/
+
+Untracked files:
+    Untracked:  .nojekyll
+    Untracked:  analysis/.nojekyll
+    Untracked:  analysis/causal_inference.Rmd
+    Untracked:  analysis/causal_inference_jj.Rmd
+    Untracked:  analysis/causal_inference_permamency.Rmd
+    Untracked:  analysis/causal_inference_stability.Rmd
+    Untracked:  analysis/data_import.Rmd
+    Untracked:  analysis/data_wrangling.Rmd
+    Untracked:  analysis/first-glance.Rmd
+    Untracked:  analysis/include/
+    Untracked:  analysis/prop_model_XG.rds
+    Untracked:  analysis/seasonal-trends.Rmd
+    Untracked:  analysis/setup.Rmd
+    Untracked:  analysis/shelter_care_population.Rmd
+    Untracked:  analysis/shelter_care_population_control.Rmd
+    Untracked:  analysis/station-map.Rmd
+    Untracked:  analysis/time-of-day-trends.Rmd
+    Untracked:  code/R/
+    Untracked:  code/SPSS/
+    Untracked:  cost_briefing.Rmd
+    Untracked:  cost_briefing.pdf
+    Untracked:  cost_briefing_files/
+    Untracked:  data/aoc/
+    Untracked:  data/case_jurisdiction.feather
+    Untracked:  data/child_birthday_18.feather
+    Untracked:  data/child_dependency_episode.feather
+    Untracked:  data/child_episode.feather
+    Untracked:  data/dependency_end_events.feather
+    Untracked:  data/dependency_start_events.feather
+    Untracked:  data/filing_events.feather
+    Untracked:  data/national_caseloads.csv
+    Untracked:  data/ospi/
+    Untracked:  data/person_ids.feather
+    Untracked:  data/person_ids_and_covariates.feather
+    Untracked:  data/petition_dismissal_events.feather
+    Untracked:  data/prop_model_XG.rds
+    Untracked:  data/prop_model_XG_ARSY.rds
+    Untracked:  data/propensity_dat.feather
+    Untracked:  data/removal_episode_ends.feather
+    Untracked:  data/removal_episode_starts.feather
+    Untracked:  data/shelter_care_events.feather
+    Untracked:  data/shelter_care_events_timed.feather
+    Untracked:  data/shelter_care_events_timed.featherr
+    Untracked:  data/shelter_care_events_timed_control.feather
+    Untracked:  data/shelter_care_events_timed_filtered.feather
+    Untracked:  data/termination_cases.feather
+    Untracked:  downloadFigs4latex_final-clean/
+    Untracked:  final-clean.Rmd
+    Untracked:  final-clean.docx
+    Untracked:  final-clean.pdf
+    Untracked:  final.Rmd
+    Untracked:  final.pdf
+    Untracked:  final_files/
+    Untracked:  styles.docx
+
+Unstaged changes:
+    Modified:   .gitignore
+    Modified:   analysis/_site.yml
+    Deleted:    analysis/about.Rmd
+    Modified:   analysis/index.Rmd
+    Modified:   analysis/license.Rmd
+    Modified:   legal-representation-evaluation.Rproj
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with <code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<div id="treatment-vs-treatment" class="section level1">
+<h1>Treatment vs Treatment</h1>
+<pre class="r"><code>shelter_care_events_timed_filtered &lt;- feather::read_feather(&quot;~/legal-representation-evaluation/data/shelter_care_events_timed_filtered.feather&quot;)
+
+covs &lt;- c(&quot;age&quot;, &quot;minority&quot;, &quot;strategy_id&quot;)
+
+episode_trans_times &lt;- c(NA, &quot;days_to_reunification&quot;, &quot;days_to_guardianship&quot;, &quot;days_to_adoption&quot;)
+
+episode_trans_states &lt;- c(NA, &quot;fl_reunification&quot;, &quot;fl_guardianship&quot;, &quot;fl_adoption&quot;) 
+
+treatment_vs_treatment_early &lt;- shelter_care_events_timed_filtered %&gt;%
+  filter(
+    fl_treatment_counties == 1,
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$treatment_stop_date),ymd(params$treatment_censor_date)), 
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$control_stop_date),ymd(params$control_censor_date)) 
+  ) %&gt;%
+  left_join(
+    placement_events_stability %&gt;%
+    filter(
+      fl_in_early, 
+     # fl_start_after_75 == 1,  
+    #  fl_start_before_365 == 1,
+      days_in_placement &gt;= 9*30
+    ),
+    by = c(&quot;id_case_dependency&quot;, &quot;id_removal_episode_fact&quot;)
+  ) %&gt;%
+  mutate(
+    fl_strategy = ifelse(id_calendar_dim_shelter_care_begin &gt;= params$treatment_start_date, 1, 0),
+    fl_early_stability = case_when(
+      !is.na(fl_in_early) ~ 1, 
+      is.na(id_removal_episode_fact) ~ 1,
+      days_of_system_involvement &lt;= 75 &amp; tx_discharge_type != &quot;Still In Care&quot; ~ 1,
+      TRUE ~ 0
+    ),   
+    tx_early_stability = case_when(
+      !is.na(fl_in_early) ~ tx_plcm_setng, 
+      is.na(id_removal_episode_fact) ~ &#39;No Placement&#39;,
+      days_of_system_involvement &lt;= 75 &amp; tx_discharge_type != &quot;Still In Care&quot; ~ &#39;Permanency&#39;,
+      TRUE ~ &#39;No Early Stability&#39;
+    ), 
+    fct_early_stability = as.factor(tx_early_stability), 
+    fct_early_stability = relevel(fct_early_stability, ref = &#39;No Early Stability&#39;)
+    )
+
+treatment_vs_treatment_late &lt;- shelter_care_events_timed_filtered %&gt;%
+  filter(
+    fl_treatment_counties == 1,
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$treatment_stop_date),ymd(params$treatment_censor_date)), 
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$control_stop_date),ymd(params$control_censor_date)) 
+  ) %&gt;%
+  left_join(
+    placement_events_stability %&gt;%
+    filter(
+      fl_in_late, 
+      days_in_placement &gt;= 9*30
+    ),
+    by = c(&quot;id_case_dependency&quot;, &quot;id_removal_episode_fact&quot;)
+  ) %&gt;%
+  mutate(
+    fl_strategy = ifelse(id_calendar_dim_shelter_care_begin &gt;= params$treatment_start_date, 1, 0),
+    fl_late_stability = case_when(
+      !is.na(fl_in_late) ~ 1, 
+      days_of_system_involvement &lt;= 75 &amp; tx_discharge_type != &quot;Still In Care&quot; ~ 1,
+      TRUE ~ 0
+    ),   
+    tx_late_stability = case_when(
+      !is.na(fl_in_late) ~ tx_plcm_setng, 
+      days_of_system_involvement &gt; 75 &amp; days_of_system_involvement &lt;= 365 &amp; tx_discharge_type != &quot;Still In Care&quot; ~ &#39;Permanency&#39;,
+      TRUE ~ &#39;No Late Stability&#39;
+    ), 
+    fct_late_stability = as.factor(tx_late_stability), 
+    fct_late_stability = relevel(fct_late_stability, ref = &#39;No Late Stability&#39;)
+    )
+
+
+library(nnet)
+
+
+summary(glm(fl_early_stability ~ fl_strategy +
+      age_at_shelter_care_days + 
+      fl_minority, 
+    data = treatment_vs_treatment_early))</code></pre>
+<pre><code>
+Call:
+glm(formula = fl_early_stability ~ fl_strategy + age_at_shelter_care_days + 
+    fl_minority, data = treatment_vs_treatment_early)
+
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-0.6529  -0.5583   0.3478   0.4289   0.5046  
+
+Coefficients: (1 not defined because of singularities)
+                           Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)               5.742e-01  9.100e-02   6.310 1.09e-08 ***
+fl_strategy                      NA         NA      NA       NA    
+age_at_shelter_care_days -1.292e-05  2.859e-05  -0.452    0.652    
+fl_minority               7.871e-02  1.068e-01   0.737    0.463    
+---
+Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+
+(Dispersion parameter for gaussian family taken to be 0.2491285)
+
+    Null deviance: 22.132  on 90  degrees of freedom
+Residual deviance: 21.923  on 88  degrees of freedom
+AIC: 136.73
+
+Number of Fisher Scoring iterations: 2</code></pre>
+<pre class="r"><code>summary(multinom(fct_early_stability ~ fl_strategy + age_at_shelter_care_days + 
+      fl_minority, data = treatment_vs_treatment_early))</code></pre>
+<pre><code># weights:  25 (16 variable)
+initial  value 146.458850 
+iter  10 value 118.486631
+iter  20 value 117.196347
+iter  30 value 117.187671
+final  value 117.187664 
+converged</code></pre>
+<pre><code>Call:
+multinom(formula = fct_early_stability ~ fl_strategy + age_at_shelter_care_days + 
+    fl_minority, data = treatment_vs_treatment_early)
+
+Coefficients:
+             (Intercept) fl_strategy age_at_shelter_care_days fl_minority
+Foster        -0.3162805           0            -7.306404e-05  -0.2612365
+Kin           -0.5357173           0            -1.204979e-04   0.4766237
+No Placement -17.8218436           0             3.152115e-04  15.1364065
+Permanency    -2.2406740           0             6.863432e-05   0.8625535
+
+Std. Errors:
+             (Intercept)  fl_strategy age_at_shelter_care_days fl_minority
+Foster        0.42981192          NaN             0.0001478961  0.52985514
+Kin           0.45071139 2.157578e-16             0.0001534322  0.50501729
+No Placement  0.08156268          NaN             0.0002154848  0.08156277
+Permanency    0.39360884 0.000000e+00             0.0001934154  0.35781709
+
+Residual Deviance: 234.3753 
+AIC: 258.3753 </code></pre>
+<pre class="r"><code>summary(glm(fl_late_stability ~ fl_strategy +
+      age_at_shelter_care_days + 
+      fl_minority + age_at_shelter_care_days*fl_strategy, 
+    data = treatment_vs_treatment_late))</code></pre>
+<pre><code>
+Call:
+glm(formula = fl_late_stability ~ fl_strategy + age_at_shelter_care_days + 
+    fl_minority + age_at_shelter_care_days * fl_strategy, data = treatment_vs_treatment_late)
+
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-0.3654  -0.3308  -0.2518   0.6462   0.7828  
+
+Coefficients: (2 not defined because of singularities)
+                                       Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)                           3.655e-01  8.406e-02   4.349 3.67e-05 ***
+fl_strategy                                  NA         NA      NA       NA    
+age_at_shelter_care_days             -1.239e-05  2.641e-05  -0.469    0.640    
+fl_minority                          -1.082e-01  9.870e-02  -1.097    0.276    
+fl_strategy:age_at_shelter_care_days         NA         NA      NA       NA    
+---
+Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+
+(Dispersion parameter for gaussian family taken to be 0.2125961)
+
+    Null deviance: 18.989  on 90  degrees of freedom
+Residual deviance: 18.708  on 88  degrees of freedom
+AIC: 122.3
+
+Number of Fisher Scoring iterations: 2</code></pre>
+<pre class="r"><code>summary(multinom(fct_late_stability ~ fl_strategy + age_at_shelter_care_days + 
+      fl_minority, data = treatment_vs_treatment_late))</code></pre>
+<pre><code># weights:  25 (16 variable)
+initial  value 146.458850 
+iter  10 value 92.578776
+iter  20 value 81.884352
+iter  30 value 81.868653
+final  value 81.866724 
+converged</code></pre>
+<pre><code>Call:
+multinom(formula = fct_late_stability ~ fl_strategy + age_at_shelter_care_days + 
+    fl_minority, data = treatment_vs_treatment_late)
+
+Coefficients:
+           (Intercept) fl_strategy age_at_shelter_care_days fl_minority
+Foster       -1.229557           0            -7.593837e-05  -1.3233332
+Group        -3.857117           0             1.139277e-04  -8.3148517
+Kin          -1.525471           0            -2.480063e-04  -0.4105383
+Permanency   -3.001019           0             4.823331e-05   0.9332860
+
+Std. Errors:
+           (Intercept) fl_strategy age_at_shelter_care_days  fl_minority
+Foster       0.5203933         NaN             0.0001879311 8.142004e-01
+Group        0.0359938         NaN             0.0003124093 6.314915e-06
+Kin          0.6087984           0             0.0002513017 7.718333e-01
+Permanency   0.3694502           0             0.0002073904 3.517880e-01
+
+Residual Deviance: 163.7334 
+AIC: 187.7334 </code></pre>
+</div>
+<div id="treatment-vs-control-leg" class="section level1">
+<h1>Treatment vs Control Leg</h1>
+<pre class="r"><code>treatment_vs_control_leg &lt;- shelter_care_events_timed_filtered %&gt;%
+  filter(
+    fl_treatment_counties == 1 | fl_leg_counties == 1
+  ) %&gt;%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, &quot;Minority&quot;, &quot;Non-Minority&quot;),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin &gt;= params$treatment_start_date &amp; fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %&gt;%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   </code></pre>
+</div>
+<div id="treatment-vs-control-rwj" class="section level1">
+<h1>Treatment vs Control RWJ</h1>
+<pre class="r"><code>treatment_vs_control_similar &lt;- shelter_care_events_timed_filtered %&gt;%
+  filter(
+    fl_treatment_counties == 1 | fl_similar_counties == 1
+  ) %&gt;%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, &quot;Minority&quot;, &quot;Non-Minority&quot;),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin &gt;= params$treatment_start_date &amp; fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %&gt;%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   </code></pre>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span> Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.0.2 (2020-06-22)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS  10.16
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRblas.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] grid      stats     graphics  grDevices utils     datasets  methods  
+[8] base     
+
+other attached packages:
+ [1] nnet_7.3-14         lubridate_1.7.8     hesim_0.5.0        
+ [4] flexsurv_2.0        mstate_0.2.12       ggpubr_0.4.0       
+ [7] twang_1.6           latticeExtra_0.6-29 lattice_0.20-41    
+[10] xtable_1.8-4        survey_4.0          survival_3.1-12    
+[13] Matrix_1.2-18       gbm_2.1.8           ggdag_0.2.3        
+[16] dagitty_0.3-1       forcats_0.5.0       stringr_1.4.0      
+[19] dplyr_1.0.3         purrr_0.3.4         readr_1.4.0        
+[22] tidyr_1.1.2         tibble_3.0.5        ggplot2_3.3.0      
+[25] tidyverse_1.3.0     workflowr_1.6.2    
+
+loaded via a namespace (and not attached):
+ [1] colorspace_2.0-0    ggsignif_0.6.0      ellipsis_0.3.1     
+ [4] rio_0.5.16          rprojroot_2.0.2     fs_1.4.1           
+ [7] rstudioapi_0.11     dotenv_1.0.2        bit64_0.9-7        
+[10] fansi_0.4.2         mvtnorm_1.1-1       feather_0.3.5      
+[13] xml2_1.3.2          splines_4.0.2       knitr_1.31         
+[16] jsonlite_1.7.2      broom_0.7.5         dbplyr_2.0.0.9000  
+[19] png_0.1-7           compiler_4.0.2      httr_1.4.2         
+[22] backports_1.2.1     assertthat_0.2.1    cli_2.2.0          
+[25] later_1.1.0.1       htmltools_0.5.1.1   tools_4.0.2        
+[28] igraph_1.2.5        gtable_0.3.0        glue_1.4.2         
+[31] V8_3.2.0            Rcpp_1.0.6          carData_3.0-4      
+[34] cellranger_1.1.0    vctrs_0.3.6         xfun_0.20          
+[37] openxlsx_4.2.3      rvest_1.0.0         lifecycle_1.0.0    
+[40] rstatix_0.6.0       muhaz_1.2.6.1       MASS_7.3-51.6      
+[43] odbc_1.3.0          scales_1.1.1        tidygraph_1.2.0    
+[46] hms_1.0.0           promises_1.2.0.9000 RColorBrewer_1.1-2 
+[49] yaml_2.2.1          curl_4.3            stringi_1.5.3      
+[52] highr_0.8           boot_1.3-27         zip_2.1.1          
+[55] rlang_0.4.10        pkgconfig_2.0.3     evaluate_0.14      
+[58] bit_1.1-15.2        tidyselect_1.1.0    deSolve_1.28       
+[61] magrittr_2.0.1      R6_2.5.0            generics_0.1.0     
+[64] DBI_1.1.0           pillar_1.4.7        haven_2.3.1        
+[67] foreign_0.8-80      withr_2.4.1         abind_1.4-5        
+[70] modelr_0.1.7        crayon_1.3.4        car_3.0-10         
+[73] rmarkdown_2.6.6     jpeg_0.1-8.1        readxl_1.3.1       
+[76] data.table_1.13.6   blob_1.2.1          git2r_0.27.1       
+[79] reprex_0.3.0        digest_0.6.27       httpuv_1.5.4       
+[82] numDeriv_2016.8-1.1 munsell_0.5.0       mitools_2.4        
+[85] quadprog_1.5-8     </code></pre>
+</div>
+</div>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+http://docs.mathjax.org/en/latest/configuration.html.  This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

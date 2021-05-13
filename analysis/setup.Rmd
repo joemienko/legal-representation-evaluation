@@ -1,0 +1,18 @@
+---
+title: "Setup for DCLRE data analysis"
+author: "Joe Mienko"
+output: workflowr::wflow_html
+---
+
+```{r knitr-opts, include=FALSE}
+knitr::opts_chunk$set(comment = "#",collapse = TRUE)
+```
+
+To reproduce the results on your own computer, please follow these 
+setup instructions.
+
+## Setup instructions
+
+Download or clone the
+[git repository](https://github.com/stephenslab/wflow-divvy)
+on your computer.

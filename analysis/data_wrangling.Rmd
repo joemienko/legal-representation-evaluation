@@ -1,0 +1,730 @@
+---
+title: "Data Wrangling"
+author: "Joe Mienko"
+output: workflowr::wflow_html
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	#cache = TRUE, 
+	autodep = TRUE
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+con <- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = "ODBC Driver 17 for SQL Server",
+  Server = Sys.getenv("MSSQL_SERVER"),
+  Database = Sys.getenv("MSSQL_DB"),
+  UID = Sys.getenv("MSSQL_UN"),
+  PWD = Sys.getenv("MSSQL_PW"),
+  Port = Sys.getenv("MSSQL_PORT")
+)
+```
+
+## Population Data Setup
+
+We begin with a discussion of data obtained from AOC and DCYF alone. These data serve as the basis for the main population of interest in this evaluation - children who entered a period of *shelter care* according to study period parameters in the following table.
+
+The figure below displays the relationships between DCYF and AOC data used in this evaluation using "entity relationship diagram (ERD)" symbols. 
+
+![](https://lucid.app/publicSegments/view/689b1f64-8e76-431e-b2e0-ebf43aec296a/image.png)
+
+### Missing Data 
+
+To start, we make a small update to the `dclre.famlink` table that was discovered during preliminary analyses of the data. Here we update the table to align with the post-adoptive identifier for a child. The original match from AOC aligned on the pre-adoptive identifier. 
+
+```{sql, connection=con}
+set nocount on
+
+if object_id('tempdb..##famlink_xwalk') is not null
+    drop table ##famlink_xwalk;
+
+select 
+    max(Famlink_PersonID) Famlink_PersonID
+    ,ResearchID
+into ##famlink_xwalk
+from dclre.famlink f
+group by 
+    ResearchID;  
+
+if object_id('tempdb..##missing_xwalk_data') is not null
+    drop table ##missing_xwalk_data;
+
+create table ##missing_xwalk_data
+(
+ResearchID int,
+Famlink_PersonID int
+);
+
+insert into ##missing_xwalk_data
+values 
+(
+2347455, 3194119 --apparent post-adoptive identifier
+);
+
+insert into 
+dclre.famlink
+select * from ##missing_xwalk_data mxd
+where Famlink_PersonID not in (select Famlink_PersonID from dclre.famlink);
+```
+
+### Maximum Data 
+
+Using the database connection, we next select the maximum available dates from our two main sources of data - the Department of Children Youth and Families (DCYF), and data from the Administrative Office of the Courts (AOC). These values will be used to parameterize queries below.  
+
+```{sql, connection=con, output.var="dcyf_data_end_tbl"}
+select max(id_calendar_dim_begin) from base.rptPlacement;
+```
+
+```{r assign_dcyf_date, class.source="r"}
+dcyf_data_end <- as.integer(dcyf_data_end_tbl[1,1])
+```
+
+```{sql, connection=con, output.var="aoc_data_end_tbl"}
+select max(file_date_key) from dclre.dep_case;
+```
+
+```{r assign_aoc_date_max, class.source="r"}
+aoc_data_end <- as.integer(aoc_data_end_tbl[1,1])
+```
+
+```{sql, connection=con, output.var="aoc_data_begin_tbl"}
+select min(file_date_key) from dclre.dep_case;
+```
+
+```{r assign_aoc_date_min, class.source="r"}
+aoc_data_begin <- as.integer(aoc_data_begin_tbl[1,1])
+```
+
+### Child Episodes
+
+In this chunk of code, we find the first legal fact record for a removal episode in FamLink. This will be used to determine if a removal episode begins a legal period of shelter care (i.e. a non-voluntary placement agreement) or not. Removal episodes which are not started with a VPA mark the beginning of shelter care , even if the shelter care hearing (or a shelter care order) has not yet been entered. We also pull additional information (e.g. legally free date), which we may need to fill in holes in AOC data. Finally, we restrict episodes to those that took place within 180 days of `r aoc_data_begin` - the earliest record of AOC data available. 
+
+```{sql, connection=con}
+set nocount on
+
+if object_id('tempdb..##child_episode') is not null
+    drop table ##child_episode;
+
+with first_legal_fact as
+(
+select 
+	rp.child id_person_child,
+	rp.id_removal_episode_fact,
+	rp.id_calendar_dim_begin,
+    case
+        when rp.id_calendar_dim_afcars_end = 0
+        then ?dcyf_data_end
+        else rp.id_calendar_dim_afcars_end
+    end id_calendar_dim_episode_end,
+    rp.id_calendar_dim_afcars_end,
+	rp.cd_county,
+	dte.alt_discharge_type,
+	rp.dur_days,
+	rp.tx_placement_care_auth_last,
+	rp.tx_placement_care_auth,
+	rp.exit_reason,
+	rp.id_intake_fact, 
+    rp.id_case,
+    rp.birthdate,
+    rp.lf_dt dt_legally_free,
+	min(lf.id_legal_fact) id_legal_fact_first
+from [CA_ODS].base.rptPlacement rp
+	left join dbo.legal_fact lf
+		on lf.id_case = rp.id_case
+			and lf.id_prsn = rp.child
+			and lf.id_calendar_dim_effective between rp.id_calendar_dim_begin 
+				and case
+                        when rp.id_calendar_dim_afcars_end = 0
+                        then ?dcyf_data_end
+                        else rp.id_calendar_dim_afcars_end
+                    end
+	left join dbo.ref_lookup_cd_discharge_type_exits dte
+		on dte.cd_discharge_type = rp.cd_discharge_type
+group by 
+	rp.child,
+	rp.id_removal_episode_fact,
+	rp.id_calendar_dim_begin,
+	rp.id_calendar_dim_afcars_end,
+	rp.cd_county,
+	rp.dur_days,
+	rp.tx_placement_care_auth_last,
+	rp.tx_placement_care_auth,
+	rp.exit_reason,
+	rp.id_intake_fact,
+	rp.lf_dt,
+	dte.alt_discharge_type,
+    rp.birthdate,
+    rp.id_case
+)
+
+select 
+	flf.id_person_child,
+	flf.id_removal_episode_fact,
+	flf.id_legal_fact_first,
+	ljd.id_legal_jurisdiction_dim,
+	flf.id_calendar_dim_begin id_calendar_dim_episode_begin,
+    flf.id_calendar_dim_afcars_end,
+	flf.id_calendar_dim_episode_end,
+	ljd.tx_jurisdiction,
+	flf.cd_county,
+	rlc.county_desc,
+	lad.tx_legal_action,
+	lrd.tx_result,
+	flf.alt_discharge_type,
+	flf.tx_placement_care_auth_last,
+	flf.tx_placement_care_auth,
+	flf.exit_reason,
+	flf.id_intake_fact,
+	lf.id_calendar_dim_effective,
+	flf.dt_legally_free,
+    flf.id_case,
+    flf.birthdate
+into ##child_episode
+from first_legal_fact flf
+	left join dbo.legal_fact lf
+		on lf.id_legal_fact = flf.id_legal_fact_first
+	left join dbo.legal_jurisdiction_dim ljd 
+		on lf.id_legal_jurisdiction_dim = ljd.id_legal_jurisdiction_dim
+	left join dbo.ref_lookup_county rlc
+		on flf.cd_county = rlc.county_cd
+	left join dbo.legal_action_dim lad
+		on lf.id_legal_action_dim = lad.id_legal_action_dim
+	left join dbo.legal_result_dim lrd
+		on lf.id_legal_result_dim = lrd.id_legal_result_dim
+where convert(datetime,convert(char(8),flf.id_calendar_dim_begin)) > dateadd(dd, -180, convert(datetime,convert(char(8),?aoc_data_begin)));
+
+```
+
+### Child Dependencies
+
+Pull an analogously keyed table for dependency data (from AOC).
+
+```{sql, connection=con}
+set nocount on
+
+if object_id('tempdb..##child_dependency') is not null
+    drop table ##child_dependency;
+
+select distinct 
+	dc.case_id id_case_dependency,
+	dc.file_date_key id_calendar_dim_dependency_begin,
+    case
+        when dc.resolution_date_key >= ?aoc_data_end
+        then ?aoc_data_end
+        else dc.resolution_date_key
+    end id_calendar_dim_dependency_end,
+	f.Famlink_PersonID id_person_child,
+	dc.court_cd
+into ##child_dependency
+from dclre.dep_case dc
+	left join dclre.dep_case_participant dcp
+		on dc.case_id = dcp.case_id
+		and dcp.case_party_type_cd = 'DEP'
+	left join ##famlink_xwalk f
+		on dcp.ResearchID = f.ResearchID
+where case_cause_cd = 'DEP';
+```
+
+### Child Dependency Episodes
+
+Using [de Morgan's laws](https://en.wikipedia.org/wiki/De_Morgan%27s_laws), we can find intersecting dependencies and episodes as follows: 
+
+```{sql, connection=con}
+set nocount on
+
+if object_id('tempdb..##child_dependency_episode_raw') is not null
+    drop table ##child_dependency_episode_raw;
+
+select
+	ceml.id_person_child,
+	ceml.id_removal_episode_fact,
+	ceml.id_calendar_dim_episode_begin,
+  ceml.id_calendar_dim_afcars_end,
+	ceml.id_calendar_dim_episode_end,
+	cd.id_case_dependency,
+	cd.id_calendar_dim_dependency_begin,
+	cd.id_calendar_dim_dependency_end
+into ##child_dependency_episode_raw
+from ##child_episode ceml
+	left join ##child_dependency cd
+		on ceml.id_person_child = cd.id_person_child
+		and ((cd.id_calendar_dim_dependency_begin <= ceml.id_calendar_dim_episode_end)
+			and (cd.id_calendar_dim_dependency_end >= ceml.id_calendar_dim_episode_begin));
+
+```
+
+The above query will provide us with all overlapping episode and dependency periods. However, some dependency periods intersect with multiple episodes. To simiplify analyses, we select the first episode for a given dependency event using the subsequent query below. 
+
+```{sql, connection=con, output.var = 'child_dependency_episode'}
+set nocount on
+
+if object_id('tempdb..##child_dependency_episode') is not null
+    drop table ##child_dependency_episode;
+
+select 
+	er.id_person_child,
+	ce.id_intake_fact,
+	er.id_removal_episode_fact,
+    cd.id_case_dependency,
+	ce.id_calendar_dim_episode_begin,
+	er.id_calendar_dim_dependency_begin,
+	cd.id_calendar_dim_dependency_end,
+    ce.id_calendar_dim_episode_end,
+    ce.id_calendar_dim_afcars_end,
+	ce.tx_legal_action,
+	ce.tx_result,
+	ce.id_calendar_dim_effective,
+	ce.tx_jurisdiction,
+	ce.county_desc,
+	ce.tx_placement_care_auth tx_placement_care_auth_initial,
+    ce.alt_discharge_type permamency_outcome,
+	ce.alt_discharge_type,
+	case 
+		when tx_result in (
+			'Voluntary Placement Agreement Indian',
+			'Voluntary Placement Agreement - Child',
+			'Voluntary Placement Agreement DDD',
+			'Voluntary Placement Ended'
+		)
+		then 1
+		when tx_legal_action in (
+			'Voluntary Placement Agreement'
+		)
+		then 1
+		else 0
+	end fl_ooh_voluntary_start, 
+	ce.dt_legally_free,
+    ce.id_case
+into ##child_dependency_episode
+from ##child_dependency_episode_raw er
+	join ##child_dependency cd
+		on er.id_calendar_dim_dependency_begin = cd.id_calendar_dim_dependency_begin
+            and er.id_person_child = cd.id_person_child
+	join ##child_episode ce
+		on er.id_removal_episode_fact = ce.id_removal_episode_fact
+order by ce.id_person_child;
+
+select * from ##child_dependency_episode;
+```
+
+### Dependency Filing Events
+
+The following query selects dependency filing events (i.e. events which begin shelter care for children that were not placed under police protective custody or hospital holds). 
+
+```{sql, connection=con, output.var = "filing_events"}
+set nocount on
+
+if object_id('tempdb..##filing_events') is not null
+    drop table ##filing_events;
+
+select distinct
+	dc.case_id id_case_dependency,
+    dc.file_date_key id_calendar_dim_dependency_petition,
+    'DPP' docket_cd,
+    dcp.actor_key id_person_aoc
+into ##filing_events
+from dclre.dep_case dc
+    left join dclre.dep_case_participant dcp 
+        on dc.case_id = dcp.case_id
+            and dcp.case_party_type_cd = 'DEP'
+    left join dclre.famlink f 
+        on dcp.ResearchID = f.ResearchID
+    join dclre.people_dim pd
+        on pd.id_prsn = f.Famlink_PersonID
+where convert(char(8), dateadd(yy, 18, pd.dt_birth), 112) >  dc.file_date_key;
+
+select * from ##filing_events;
+```
+
+### Removal Episode Starts
+
+The following query selects removal episode starting events (i.e. events which begin shelter care for children that were placed under police protective custody or hospital holds). We also include voluntary removals as potential comparison cases. Voluntary placement cases may also transition into shelter care before the expiration of the voluntary placement agreement.  
+
+```{sql, connection=con, output.var = "removal_episode_starts"}
+set nocount on
+
+if object_id('tempdb..##removal_episode_starts') is not null
+    drop table ##removal_episode_starts;
+
+select distinct
+	cde.id_case_dependency,
+    cde.id_removal_episode_fact,
+    cde.id_calendar_dim_episode_begin,
+    case
+        when fl_ooh_voluntary_start = 1
+        then 'VOLUNTARY REMOVAL'
+        when fl_ooh_voluntary_start = 0
+        then 'NON-VOLUNTARY REMOVAL'
+    end tx_removal,
+    f.Famlink_PersonID id_person_child     
+into ##removal_episode_starts
+from ##child_dependency_episode cde
+    left join dclre.dep_case_participant dcp 
+        on cde.id_case_dependency = dcp.case_id
+            and dcp.case_party_type_cd = 'DEP'
+    left join ##famlink_xwalk f 
+        on dcp.ResearchID = f.ResearchID;
+        
+select * from ##removal_episode_starts;
+```
+
+The subsequent chunk of code selects the end dates associated with the removal episode starts selected in the query above. 
+
+```{sql, connection=con, output.var="removal_episode_ends"}
+set nocount on
+
+if object_id('tempdb..##removal_episode_ends') is not null
+    drop table ##removal_episode_ends;
+
+select distinct
+	res.id_case_dependency,
+    res.id_removal_episode_fact,
+    cde.id_calendar_dim_afcars_end,
+    res.tx_removal,
+    res.id_person_child    
+into ##removal_episode_ends
+from ##removal_episode_starts res
+    left join ##child_dependency_episode cde
+        on res.id_case_dependency = cde.id_case_dependency;
+        
+select * from ##removal_episode_ends;
+
+```
+
+### Shelter Care Hearing Events
+
+The following query selects shelter care hearing events - the first hearing event associated with a particular docket. During the pilot period, this should be the point at which attorneys are assigned to children. It should also take place after the legal period of shelter care begins on the basis of a dependency petition, a child being placed into protective custody, or a child being placed on an administrative "hospital hold". 
+
+```{sql, connection=con, output.var = "shelter_care_events"}
+set nocount on
+
+if object_id('tempdb..##shelter_care_events') is not null
+    drop table ##shelter_care_events;
+
+with shelter_care_hearings as 
+(
+select 
+    dcd.case_id id_case_dependency, 
+    dcd.docket_date dt_shelter_care_hearing, 
+    dcd.docket_cd,
+    dcd.docket_date_key id_calendar_dim_shelter_care_hearing,
+    ROW_NUMBER() OVER(PARTITION BY dcd.case_id 
+                     ORDER BY dcd.sequence_num) AS rk
+from [CA_ODS].[dclre].[dep_case_docket] dcd 
+where docket_cd in ('SCUHRG', 'SCCHRG')
+), selectable_shelter_care_hearings as
+(
+select 
+    s.id_case_dependency, 
+    s.dt_shelter_care_hearing, 
+    s.docket_cd,
+    s.id_calendar_dim_shelter_care_hearing,
+    s.rk
+from shelter_care_hearings s
+where s.rk = 1
+)
+
+select distinct 
+	sch.id_case_dependency,
+	sch.id_calendar_dim_shelter_care_hearing,
+	sch.docket_cd,
+    dcp.actor_key id_person_aoc,
+    f.Famlink_PersonID id_person_child
+into ##shelter_care_events
+from selectable_shelter_care_hearings sch
+    left join dclre.dep_case_participant dcp 
+        on sch.id_case_dependency = dcp.case_id
+            and dcp.case_party_type_cd = 'DEP'
+    left join ##famlink_xwalk f 
+        on dcp.ResearchID = f.ResearchID;
+        
+select * from ##shelter_care_events;
+```
+
+### Dependency Start Events
+
+The following query selects dependency start events - the point at which the court enters an order of dependency. It should also take place after the shelter care hearing selected above.
+
+```{sql, connection=con, output.var = "dependency_start_events"}
+set nocount on
+
+if object_id('tempdb..##dependency_start_events') is not null
+    drop table ##dependency_start_events;
+
+with dependency_starts as 
+(
+select 
+    dcd.case_id id_case_dependency, 
+    dcd.docket_date dt_dependency_begin, 
+    dcd.docket_cd,
+    dcd.docket_date_key id_calendar_dim_dependency_start,
+    ROW_NUMBER() OVER(PARTITION BY dcd.case_id 
+                     ORDER BY dcd.sequence_num) AS rk
+from [CA_ODS].[dclre].[dep_case_docket] dcd 
+where docket_cd in ('ORODM', 'ORODF', 'OROD', 'ORTPCR', 'ORDD')
+), selectable_dependency_starts as
+(
+select 
+    d.id_case_dependency, 
+    d.dt_dependency_begin, 
+    d.docket_cd,
+    d.id_calendar_dim_dependency_start,
+    d.rk
+from dependency_starts d
+where rk = 1
+), relinquish_mom as 
+(
+select 
+    d.case_id id_case_dependency, 
+    d.docket_date dt_dependency_begin, 
+    d.docket_cd,
+    d.docket_date_key id_calendar_dim_dependency_start
+from dclre.dep_case_docket d
+where docket_cd = 'RELM'
+), relinquish_dad as
+(
+select 
+    d.case_id id_case_dependency, 
+    d.docket_date dt_dependency_begin, 
+    d.docket_cd,
+    d.docket_date_key id_calendar_dim_dependency_start
+from dclre.dep_case_docket d
+where docket_cd = 'RELF'
+), tpr_all as 
+(
+select * from relinquish_dad 
+union 
+select * from relinquish_mom
+), tpr_final as 
+(
+select 
+    id_case_dependency,
+    max(id_calendar_dim_dependency_start) id_calendar_dim_dependency_start,
+    'REL*' docket_cd
+from tpr_all
+group by 
+    id_case_dependency
+), combined_dependency_starts_all as 
+(
+select
+	t.id_case_dependency,
+	t.id_calendar_dim_dependency_start
+from tpr_final t
+union 
+select
+	s.id_case_dependency,
+	s.id_calendar_dim_dependency_start
+from selectable_dependency_starts s
+), first_dependency_start as (
+select 
+	id_case_dependency,
+    min(id_calendar_dim_dependency_start) id_calendar_dim_dependency_start
+from combined_dependency_starts_all
+group by 
+    id_case_dependency
+)
+
+
+select
+	ds.id_case_dependency,
+	ds.id_calendar_dim_dependency_start,
+	'START OR RELINQ' docket_cd,
+  dcp.actor_key id_person_aoc,
+  f.Famlink_PersonID id_person_child 
+into ##dependency_start_events 
+from first_dependency_start ds
+  left join dclre.dep_case_participant dcp 
+      on ds.id_case_dependency = dcp.case_id
+        and dcp.case_party_type_cd = 'DEP'
+  left join ##famlink_xwalk f 
+      on dcp.ResearchID = f.ResearchID;
+      
+select * from ##dependency_start_events;
+```
+
+### Petition Dismissal Events
+
+The following query selects petition dismissal events - the point at which the court enters an order dismissing the dependency petition. This event should be greater than or equal to the first shelter care hearing selected above. It also implies that the dependency was never established.
+
+```{sql, connection=con, output.var="petition_dismissal_events"}
+set nocount on
+
+if object_id('tempdb..##petition_dismissal_events') is not null
+    drop table ##petition_dismissal_events;
+
+with petition_dismissals as 
+(
+select 
+    dcd.case_id id_case_dependency, 
+    dcd.docket_date dt_dismissal, 
+    dcd.docket_cd,
+    dcd.docket_date_key id_calendar_dim_dismissal,
+    ROW_NUMBER() OVER(PARTITION BY dcd.case_id 
+                     ORDER BY dcd.sequence_num) AS rk
+from [CA_ODS].[dclre].[dep_case_docket] dcd 
+where docket_cd in ('ORDNE', 'ORDSM', 'ORDPP')
+), selectable_dismissals as
+(
+select 
+   pd.id_case_dependency, 
+   pd.dt_dismissal, 
+   pd.docket_cd,
+   pd.id_calendar_dim_dismissal,
+   pd.rk
+from petition_dismissals pd
+)
+
+select
+	pd.id_case_dependency,
+    pd.id_calendar_dim_dismissal,
+    pd.docket_cd,
+    dcp.actor_key id_person_aoc,
+    f.Famlink_PersonID id_person_child 
+into ##petition_dismissal_events 
+from selectable_dismissals pd
+    left join dclre.dep_case_participant dcp 
+        on pd.id_case_dependency = dcp.case_id
+            and dcp.case_party_type_cd = 'DEP'
+    left join ##famlink_xwalk f 
+        on dcp.ResearchID = f.ResearchID;
+
+select * from ##petition_dismissal_events;
+```
+
+### Dependency End Events
+
+The following query selects dependency end events - the point at which the court dismisses an established dependency. This event should be greater than the dependency start date selected above. 
+
+```{sql, connection=con, output.var = "dependency_end_events"}
+set nocount on
+
+if object_id('tempdb..##dependency_end_events') is not null
+    drop table ##dependency_end_events;
+
+with dependency_ends as 
+(
+select 
+    dcd.case_id id_case_dependency, 
+    dcd.docket_date dt_end, 
+    dcd.docket_cd,
+    dcd.docket_date_key id_calendar_dim_dependency_end,
+    ROW_NUMBER() OVER(PARTITION BY dcd.case_id 
+                     ORDER BY dcd.sequence_num) AS rk
+from [CA_ODS].[dclre].[dep_case_docket] dcd 
+where docket_cd in ('ORDFE', 'ORDAO', 'ORDYD', 'ORDRH', 'ORDPP', 'ORDTP', 'ORDAD', 'ORDFG', 'ORDOT', 'ORDOTH', 'ORDSM')
+), selectable_dependency_ends as
+(
+select 
+   de.id_case_dependency, 
+   de.dt_end, 
+   de.docket_cd,
+   de.id_calendar_dim_dependency_end,
+   de.rk
+from dependency_ends de
+where rk = 1
+)
+
+select
+	de.id_case_dependency,
+    de.id_calendar_dim_dependency_end,
+    de.docket_cd,
+    dcp.actor_key id_person_aoc,
+    f.Famlink_PersonID id_person_child 
+into ##dependency_end_events 
+from selectable_dependency_ends de
+    left join dclre.dep_case_participant dcp 
+        on de.id_case_dependency = dcp.case_id
+            and dcp.case_party_type_cd = 'DEP'
+    left join ##famlink_xwalk f 
+        on dcp.ResearchID = f.ResearchID;
+        
+select * from ##dependency_end_events;
+
+```
+
+```{sql, connection=con, output.var="case_jurisdiction"}
+select
+    case_id id_case_dependency,
+    court_cd tx_court_code
+from dclre.dep_case;
+```
+
+```{sql, connection=con, output.var="termination_cases"}
+select
+    case_id id_case_dependency
+from dclre.dep_case
+where case_cause_cd = 'TER';
+```
+
+```{sql, connection=con, output.var="child_birthday_18"}
+select
+    d.case_id id_case_dependency,
+    coalesce(
+        convert(char(8), dateadd(yy, 18, pd.dt_birth), 112),
+        convert(char(8), dateadd(yy, 18, d.birthdate), 112)
+     ) id_calendar_dim_birthday_18
+from dclre.people_dim pd
+    join dclre.famlink f 
+        on pd.id_prsn = f.Famlink_PersonID
+    join dclre.dep_case_participant d
+        on f.ResearchID = d.ResearchID
+where d.case_party_type_cd = 'DEP'
+    and pd.is_current = 1;
+```
+
+```{sql, connection=con, output.var="person_ids_and_covariates"}
+select
+    d.case_id id_case_dependency,
+    pd.id_prsn,
+    pd.dt_birth,
+    pd.tx_braam_race,
+    pd.tx_gndr 
+from dclre.people_dim pd
+    join dclre.famlink f 
+        on pd.id_prsn = f.Famlink_PersonID
+    join dclre.dep_case_participant d
+        on f.ResearchID = d.ResearchID
+where pd.is_current = 1;
+```
+
+
+```{r save_files}
+feather::write_feather(filing_events, "data/filing_events.feather")
+
+feather::write_feather(removal_episode_starts, "data/removal_episode_starts.feather")
+
+feather::write_feather(case_jurisdiction, "data/case_jurisdiction.feather")
+
+feather::write_feather(removal_episode_ends, "data/removal_episode_ends.feather")
+
+feather::write_feather(child_dependency_episode, "data/child_dependency_episode.feather")
+
+feather::write_feather(petition_dismissal_events, "data/petition_dismissal_events.feather")
+
+feather::write_feather(dependency_end_events, "data/dependency_end_events.feather")
+
+feather::write_feather(termination_cases, "data/termination_cases.feather")
+
+feather::write_feather(child_birthday_18, "data/child_birthday_18.feather")
+
+feather::write_feather(dependency_start_events, "data/dependency_start_events.feather")
+
+feather::write_feather(shelter_care_events, "data/shelter_care_events.feather")
+
+feather::write_feather(person_ids_and_covariates, "data/person_ids_and_covariates.feather")
+
+
+
+```

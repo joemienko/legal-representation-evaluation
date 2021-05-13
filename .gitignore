@@ -4,8 +4,15 @@
 .Ruserdata
 .Rapp.history
 .DS_Store
+.env
 analysis/figure
 analysis/*png
 analysis/*html
 analysis/*_cache
 analysis/site_libs
+analysis/prop_model_XG.rds
+# knitr and R markdown default cache directories
+*_cache/
+/cache/
+data_import_cache/*_cache/
+data_import_cache/cache/

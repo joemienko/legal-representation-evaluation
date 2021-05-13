@@ -1,0 +1,590 @@
+---
+title: "Data Import"
+author: "Joe Mienko"
+output: workflowr::wflow_html
+---
+
+## Preliminaries 
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	cache = TRUE, 
+	autodep = TRUE
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+con <- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = "ODBC Driver 17 for SQL Server",
+  Server = Sys.getenv("MSSQL_SERVER"),
+  Database = Sys.getenv("MSSQL_DB"),
+  UID = Sys.getenv("MSSQL_UN"),
+  PWD = Sys.getenv("MSSQL_PW"),
+  Port = Sys.getenv("MSSQL_PORT")
+)
+```
+
+This project assumes the existence of an available SQL Server specified by variables in an `.env` file in the root of the project. The chunk of code above sets those variables for the project environment and makes a connection to the SQL Server at the specified database. 
+
+## Data Sources
+
+There are three primary sources of data used for the quantitative analysis in this evaluation: 
+
+1. Data from Odyssey and other Superior Court information systems in the State obtained from the Administrative Office of the Courts (AOC), 
+
+2. Data from FamLink, the transitional Comprehensive Child Welfare Information System (CCWIS) obtained from the Department of Children Youth and Families (DCYF), and  
+
+3. Data from various systems maintained by the Office of the Superintendent of Public Instruction (OSPI). 
+
+The following sections import these data, make some small transformations, and load the data onto the specified SQL Server. 
+
+### Import AOC
+
+The AOC files received for this study are imported using the code below. Where data are inconsistent, they are imported as strings using the `col_character()` transformation. 
+
+The SAS CCRD file cannot be read into R. Neither can the SSPS file. As such, the file was pre-processed on a machine with SPSS in the PATH on a Windows Machine using `C:\> stats ccrd.spj -prroduction silent`. The spj file and the sps file to facilitate this command are included in this repo at `~/code/SPSS/ccrd.spj`. Presumably, this could have just as easily been converted using a SAS script. 
+
+```{r import_aoc}
+dep_case_docket <- haven::read_sas("data/aoc/dep_case_docket.sas7bdat")
+dep_case_participant <- haven::read_sas("data/aoc/dep_case_participant.sas7bdat")
+dep_case <- haven::read_sas("data/aoc/dep_case.sas7bdat")
+famlink <- haven::read_sas("data/aoc/famlink.sas7bdat")
+
+ccrd <- read_csv(
+  file = "data/aoc/ccrd.csv", 
+  col_types = cols(
+    .default = col_character(),
+    ResearchID = col_double(),
+    CcrdCaseID_x = col_double(),
+    CcrdLawSeverity = col_double(),
+    CcrdLawSexualMotivation = col_character(),
+    CcrdLawDeadlyWeapon = col_character(),
+    CcrdChargeNumber = col_double(),
+    CcrdChargeSeqNumber = col_double(),
+    CcrdCaseSDA = col_character()
+  )
+)
+```
+
+### Import OSPI
+
+The OSPI files received for this study are imported using the code below. Where data are inconsistent, they are imported as strings using the `col_character()` transformation. 
+
+```{r import_ospi}
+
+ospi_absence <- read_delim(
+  "data/ospi/Absence_2013-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE,
+  col_types = cols(
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    DistrictName = col_character(),
+    SchoolCode = col_double(),
+    SchoolName = col_character(),
+    ResearchID = col_double(),
+    AbsenceDate = col_datetime(format = ""),
+    AbsenceCode = col_character(),
+    AbsenceDescription = col_character(),
+    SubmitDate = col_datetime(format = ""),
+    ExtractDate = col_datetime(format = "")
+  )
+)
+
+ospi_discipline <- read_delim(
+  "data/ospi/Discipline_2014-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character(),
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    IncidentID = col_character(),
+    IncidentDate = col_datetime(format = ""),
+    BehaviorID = col_double(),
+    BehaviorCode = col_double(),
+    InterventionApplied = col_character(),
+    InterventionAppliedDescription = col_character(),
+    InterventionDate = col_character(),
+    NumInterventionDays = col_character(),
+    IAES = col_character(),
+    EmergencyExp = col_character(),
+    EEConversionDays = col_character(),
+    ExclusionaryActionType = col_double(),
+    ExclusionaryActionDate = col_datetime(format = ""),
+    ExclusionaryTotalTime = col_character()
+  )
+)
+
+ospi_district_level_programs <- read_delim(
+  "data/ospi/DistrictLevelPrograms_2010-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character(),
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    TitleIIINativeAmericanFlag = col_character(),
+    TitleIIINativeAmericanStartDate = col_character(),
+    TitleIIINativeAmericanExitDate = col_character(),
+    TitleIIINativeAmericanExitReasonCode = col_character(),
+    TitleIIINativeAmericanExitReason = col_character(),
+    TitleIIIImmigrantFlag = col_character(),
+    TitleIIIImmigrantStartDate = col_character(),
+    TitleIIIImmigrantExitDate = col_character(),
+    TitleIIIImmigrantExitReasonCode = col_character(),
+    TitleIIIImmigrantExitReason = col_character()
+  )
+)
+
+ospi_enroll_demographics <- read_delim(
+  "data/ospi/EnrollDemographic_2010-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+  .default = col_character(),
+  SchoolYear = col_double(),
+  DistrictCode = col_double(),
+  ResidentDistrictCode = col_double(),
+  SchoolCode = col_double(),
+  LocationID = col_character(),
+  ResearchID = col_double(),
+  SchoolChoiceCode = col_double(),
+  FederalEthRaceRollupCode = col_double(),
+  StudentPrimaryLanguageCode = col_double(),
+  LanguageSpokenAtHomeCode = col_character(),
+  GradRequirementsYear = col_character(),
+  ExpectedGradYear = col_character(),
+  CreditsAttempted = col_character(),
+  CreditsEarned = col_character(),
+  CumulativeDaysPresent = col_double(),
+  IsApprovedPrivateSchoolStudentAttendingPartTimeCode = col_character(),
+  IsHomeBasedStudentAttendingPartTimeCode = col_character()
+)
+)
+
+ospi_free_reduced_lunch <- read_delim(
+  "data/ospi/FreeReducedLunch_2010-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    DistrictName = col_character(),
+    SchoolCode = col_double(),
+    SchoolName = col_character(),
+    ResearchID = col_double(),
+    FreeReducedMealsFlag = col_character(),
+    FreeMealsFlag = col_character(),
+    ReducedMealsFlag = col_character(),
+    IncomeSurveyFlag = col_character(),
+    SubmitDate = col_character(),
+    ExtractDate = col_character()
+  )
+)
+
+
+ospi_school_level_programs <- read_delim(
+  "data/ospi/SchoolLevelPrograms_2010-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE,
+  col_types = cols(
+    .default = col_character(),
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    TruancyPetitionFiledinJuvenileCourtFlag = col_character(),
+    TruancyPetitionFiledinJuvenileCourtStartDate = col_character(),
+    TruancyPetitionFiledinJuvenileCourtExitDate = col_character(),
+    TruancyPetitionFiledinJuvenileCourtExitReasonCode = col_character(),
+    TruancyPetitionFiledinJuvenileCourtExitReason = col_character(),
+    TruancyReferraltoCommunityTruancyBoardFlag = col_character(),
+    TruancyReferraltoCommunityTruancyBoardStartDate = col_character(),
+    TruancyReferraltoCommunityTruancyBoardExitDate = col_character(),
+    TruancyReferraltoCommunityTruancyBoardExitReasonCode = col_character(),
+    TruancyReferraltoCommunityTruancyBoardExitReason = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionFlag = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionStartDate = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionExitDate = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionExitReasonCode = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionExitReason = col_character(),
+    TruancyHearinginJuvenileCourtFlag = col_character()
+  )  
+)
+
+ospi_sgp_base <- read_delim(
+  "data/ospi/SGPBase_2012-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character(),
+    RecordNumber = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    ReadingSchoolCode = col_logical(),
+    MathSchoolCode = col_logical(),
+    ReportingGrade = col_character(),
+    RawScore = col_logical(),
+    BaselineSGPFlag = col_logical(),
+    EOC1Port = col_logical(),
+    CEState = col_logical(),
+    TestRepeat = col_logical()
+  )
+)
+
+ospi_sgp_cedars <- read_delim(
+  "data/ospi/SGPCEDARS_2012-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    RecordNumber = col_double(),
+    SchoolYear = col_character(),
+    IsBilingual = col_character(),
+    RaceEthnicity = col_character(),
+    RaceEthnicityCode = col_logical(),
+    IsLowIncome = col_character(),
+    IsGifted = col_character(),
+    IsHomeless = col_character(),
+    IsMigrant = col_character(),
+    IsSpecialEd = col_character()
+  )
+)
+
+ospi_special_education <- read_delim(
+  "data/ospi/SpecialEducation_2010-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    DistrictName = col_character(),
+    ResearchID = col_double(),
+    ReferralDate = col_character(),
+    InitialEligibilityDate = col_character(),
+    LastIEPReviewDate = col_character(),
+    LastEvaluationDate = col_character(),
+    SpecialEducationProgramStartDate = col_character(),
+    LRECode = col_double(),
+    LREName = col_character(),
+    ExitDate = col_character(),
+    ExitReasonCode = col_character(),
+    ExitReason = col_character(),
+    SubmitDate = col_character(),
+    ExtractDate = col_character()
+  )
+)
+
+ospi_wakids_base <- read_delim(
+  "data/ospi/WaKIDSBase_2012-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_double(),
+    SchoolYear = col_character(),
+    DistrictName = col_character(),
+    SchoolName = col_character(),
+    GenderTypeCode = col_character(),
+    SocialEmotionalDevelopmentLevel = col_character(),
+    SocialEmotionalReadinessFlag = col_character(),
+    SocialEmotionalCompletedAllObjectives = col_logical(),
+    PhysicalDevelopmentLevel = col_character(),
+    PhysicalReadinessFlag = col_character(),
+    PhysicalCompletedAllObjectives = col_logical(),
+    LanguageDevelopmentLevel = col_character(),
+    LanguageReadinessFlag = col_character(),
+    LanguageCompletedAllObjectives = col_logical(),
+    CognitiveDevelopmentLevel = col_character(),
+    CognitiveReadinessFlag = col_character(),
+    CognitiveCompletedAllObjectives = col_logical(),
+    LiteracyDevelopmentLEvel = col_character(),
+    LiteracyReadinessFlag = col_character(),
+    LiteracyCompletedAllObjectives = col_logical(),
+    MathDevelopmentLevel = col_character(), 
+    MathReadinessFlag = col_character(), 
+    SocialEmotionalRawScore = col_character(), 
+    SocialEmotionalScaleScore = col_character(), 
+    CognitiveRawScore = col_character(), 
+    CognitiveScaleScore = col_character(),
+    MathRawScore = col_character(),
+    MathScaleScore = col_character(), 
+    NumberofDomainsReadyforKindergarten = col_character(), 
+    NumberofDomainsComplete = col_character(), 
+    LanguageRawScore = col_character(),
+    LanguageScaleScore = col_character(), 
+    PhysicalRawScore = col_character(), 
+    PhysicalScaleScore = col_character(), 
+    LiteracyRawScore = col_character(), 
+    LiteracyScaleScore = col_character(),
+    PhysicalRawScore = col_character()      
+  )
+)
+
+ospi_wakids_cedars <- read_delim(
+  "data/ospi/WaKIDSCEDARS_2012-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    SchoolYear = col_character(),
+    RecordNumber = col_double(),
+    IsBilingual = col_character(),
+    RaceEthnicity = col_character(),
+    IsLowIncome = col_character(),
+    IsSpecialEd = col_character()
+  )
+)
+
+ospi_wakids_subscores <- read_delim(
+  "data/ospi/WaKIDSSubScores_2012-19.txt",
+  "\t",
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character()
+  )
+)
+```
+
+
+## Transform Data in R
+
+A small number of mutations are performened on the AOC data before loading data to the specified SQL server. 
+
+```{r transform}
+dep_case_docket <- dep_case_docket %>% 
+  mutate(
+    docket_date = lubridate::ymd(docket_date_key),
+    docket_date_key = as.integer(docket_date_key)
+  )
+
+dep_case_participant <- dep_case_participant %>% 
+  mutate(
+    birth_date_key = ifelse(birth_date_key == 0, NA, birth_date_key),
+    birthdate = lubridate::ymd(birth_date_key), 
+    begin_effective_date = lubridate::ymd(begin_effective_date_key), 
+    end_effective_date = lubridate::ymd(end_effective_date_key),
+    birth_date_key = as.integer(birth_date_key),
+    begin_effective_date_key = as.integer(begin_effective_date_key),
+    end_effective_date_key = as.integer(end_effective_date_key)
+  )
+
+dep_case <- dep_case %>% 
+  mutate(
+    file_date = lubridate::ymd(file_date_key), 
+    resolution_date = lubridate::ymd(resolution_date_key), 
+    file_date = lubridate::ymd(file_date_key), 
+    file_date_key = as.integer(file_date_key),
+    resolution_date_key = as.integer(resolution_date_key),
+  )
+
+ccrd <- ccrd %>% 
+  mutate(
+    CcrdCaseFileDate_mod = lubridate::mdy(CcrdCaseFileDate),
+    CcrdSentenceDate_mod = lubridate::mdy(CcrdSentenceDate)
+  ) 
+```
+
+## Load Data to SQL Server
+
+Data are loaded onto the SQL server using the chunk of code below. Data are specifically loaded into a schema named `dclre`. This code chunk takes several minutes to run, and the code chunk parameter `eval` is set to `FALSE`. This should only be set to `TRUE` when you are certain you want to reubuild all tables in the schema. 
+
+```{r load, eval=FALSE, include=TRUE}
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.dep_case_docket"),
+  value = dep_case_docket, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.dep_case_participant"),
+  value = dep_case_participant, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.dep_case"),
+  value = dep_case, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.famlink"),
+  value = famlink, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ccrd"),
+  value = ccrd %>% select(-CcrdDispositionText), 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_discipline"),
+  value = ospi_discipline, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_absence"),
+  value = ospi_absence, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_district_level_programs"),
+  value = ospi_district_level_programs, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_enroll_demographics"),
+  value = ospi_enroll_demographics, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_free_reduced_lunch"),
+  value = ospi_free_reduced_lunch, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_school_level_programs"),
+  value = ospi_school_level_programs, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_sgp_base"),
+  value = ospi_sgp_base, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_sgp_cedars"),
+  value = ospi_sgp_cedars, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_special_education"),
+  value = ospi_special_education, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_wakids_base"),
+  value = ospi_wakids_base, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_wakids_cedars"),
+  value = ospi_wakids_cedars, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL("dclre.ospi_wakids_subscores"),
+  value = ospi_wakids_subscores, 
+  overwrite = TRUE
+)
+```
+
+## FamLink Data Access
+
+This `dclre` schema used for this project, also contains views of FamLink Data Warehouse (FLDW) tables. The remainder of the analysis assumes access to the following FLDW tables and FamLink "base reporting tables" under the `dclre` schema. 
+
+    -- LEGAL_FACT
+    -- LEGAL_JURISDICTION_DIM
+    -- LEGAL_ACTION_DIM
+    -- LEGAL_RESULT_DIM
+    -- PEOPLE_DIM
+    -- rptPlacement_Events
+    -- rptPlacement
+
+Additionally, the following three crosswalk tables also exist in the `dclre` to assit in quickly coding placement types and permanency outcomes within the FamLink tables above. 
+
+```{sql, connection=con, output.var="ref_lookup_cd_discharge_type_exits"}
+select * from dclre.ref_lookup_cd_discharge_type_exits;
+```
+
+```{r print_ref_lookup_cd_discharge_type_exits}
+ref_lookup_cd_discharge_type_exits %>% 
+  kableExtra::kable(
+    escape = FALSE, 
+    caption = "ref_lookup_cd_discharge_type_exits"
+  ) %>%  
+  kableExtra::kable_classic(c("striped"))
+```
+
+```{sql, connection=con, output.var="ref_lookup_county"}
+select * from dclre.ref_lookup_county;
+```
+
+```{r print_ref_lookup_county}
+ref_lookup_county %>% 
+  kableExtra::kable(
+    escape = FALSE, 
+    caption = "ref_lookup_county"
+  ) %>%  
+  kableExtra::kable_classic(c("striped"))
+```
+
+```{sql, connection=con, output.var="ref_lookup_plcmnt"}
+select * from dclre.ref_lookup_plcmnt;
+```
+
+```{r print_ref_lookup_plcmnt}
+ref_lookup_plcmnt %>% 
+  kableExtra::kable(
+    escape = FALSE, 
+    caption = "ref_lookup_plcmnt"
+  ) %>%
+  kableExtra::kable_classic(c("striped"))
+```

@@ -1,0 +1,424 @@
+---
+title: "Shelter Care Population"
+author: "Joe Mienko"
+output: workflowr::wflow_html
+params:
+  use_all_data: FALSE
+  control_censor_date: 20180228 
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+source("~/legal-representation-evaluation/code/R/notin.R")
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	cache = TRUE, 
+	autodep = TRUE
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+con <- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = "ODBC Driver 17 for SQL Server",
+  Server = Sys.getenv("MSSQL_SERVER"),
+  Database = Sys.getenv("MSSQL_DB"),
+  UID = Sys.getenv("MSSQL_UN"),
+  PWD = Sys.getenv("MSSQL_PW"),
+  Port = Sys.getenv("MSSQL_PORT")
+)
+```
+
+```{sql, connection=con, output.var="dcyf_data_end_tbl", include=FALSE, cache=FALSE}
+select max(id_calendar_dim_begin) from base.rptPlacement;
+```
+
+```{r assign_dcyf_date, class.source="r", include=FALSE}
+dcyf_data_end <- as.integer(dcyf_data_end_tbl[1,1])
+```
+
+### Shelter Care Starts
+
+```{r read_files}
+
+filing_events <- feather::read_feather(
+  "~/legal-representation-evaluation/data/filing_events.feather"
+)
+
+removal_episode_starts <- feather::read_feather(
+  "~/legal-representation-evaluation/data/removal_episode_starts.feather"
+)
+
+removal_episode_ends <- feather::read_feather(
+  "~/legal-representation-evaluation/data/removal_episode_ends.feather"
+)
+
+case_jurisdiction <- feather::read_feather(
+  "~/legal-representation-evaluation/data/case_jurisdiction.feather"
+)
+
+child_dependency_episode <- feather::read_feather(
+  "~/legal-representation-evaluation/data/child_dependency_episode.feather"
+)
+
+petition_dismissal_events <- feather::read_feather(
+  "~/legal-representation-evaluation/data/petition_dismissal_events.feather"
+)
+
+dependency_end_events <- feather::read_feather(
+  "~/legal-representation-evaluation/data/dependency_end_events.feather"
+)
+
+termination_cases <- feather::read_feather(
+  "~/legal-representation-evaluation/data/termination_cases.feather"
+)
+
+child_birthday_18 <- feather::read_feather(
+  "~/legal-representation-evaluation/data/child_birthday_18.feather"
+)
+
+dependency_start_events <- feather::read_feather(
+  "~/legal-representation-evaluation/data/dependency_start_events.feather"
+)
+
+shelter_care_events <- feather::read_feather(
+  "~/legal-representation-evaluation/data/shelter_care_events.feather"
+)
+
+person_ids_and_covariates <- feather::read_feather(
+  "~/legal-representation-evaluation/data/person_ids_and_covariates.feather"
+)
+
+scomis_location_codes <- xml2::read_html(
+  "https://www.courts.wa.gov/jislink/index.cfm?fa=jislink.codeview&dir=clj_manual&file=courts"
+  ) %>%
+  rvest::html_table(fill = TRUE) %>%
+  .[[4]] %>%
+  tail(-2) %>%
+  mutate(
+    tx_county_name = stringr::str_extract(X2, ".+?(?= County)")
+  ) %>%
+  select(
+    tx_court_code = X1,
+    tx_county_name
+  )
+
+
+
+```
+
+```{r join_files}
+
+first_episodes <- removal_episode_starts %>%
+group_by(
+  id_removal_episode_fact,
+  tx_removal
+) %>%
+summarise(
+  id_calendar_dim_episode_begin = min(id_calendar_dim_episode_begin)
+)
+
+first_filings <- filing_events %>%
+group_by(
+  id_case_dependency
+) %>%
+summarise(
+  id_calendar_dim_dependency_petition = min(id_calendar_dim_dependency_petition)
+) %>%
+filter(
+  id_case_dependency %notin% termination_cases$id_case_dependency
+)
+
+shelter_care_event_starts <- first_filings %>%
+left_join(
+  child_dependency_episode %>%
+    select(
+      -id_calendar_dim_episode_begin
+    ),
+  by = "id_case_dependency"
+) %>%
+left_join(
+  first_episodes,
+  by = "id_removal_episode_fact"
+) %>%
+rowwise() %>%
+mutate(
+  id_calendar_dim_min_petition_episode = case_when(
+    is.na(id_calendar_dim_dependency_petition) ~ id_calendar_dim_episode_begin,
+    is.na(id_calendar_dim_episode_begin) ~ id_calendar_dim_dependency_petition,
+    id_calendar_dim_episode_begin > id_calendar_dim_dependency_petition ~ id_calendar_dim_dependency_petition,
+    id_calendar_dim_dependency_petition > id_calendar_dim_episode_begin ~ id_calendar_dim_episode_begin,
+    id_calendar_dim_dependency_petition == id_calendar_dim_episode_begin ~ id_calendar_dim_episode_begin
+  ),
+  tx_removal = ifelse(is.na(tx_removal), 'NO REMOVAL', tx_removal),
+  id_calendar_dim_shelter_care_begin = ifelse(
+    tx_removal %in% c('VOLUNTARY', 'NO REMOVAL'),
+    id_calendar_dim_dependency_petition,
+    id_calendar_dim_min_petition_episode
+  ), 
+  tx_shelter_care_source = case_when(
+    id_calendar_dim_shelter_care_begin == id_calendar_dim_dependency_petition ~ "PETITION",
+    id_calendar_dim_shelter_care_begin == id_calendar_dim_episode_begin ~ "REMOVAL"
+  ),
+  tx_shelter_care_entry_cohort = substr(id_calendar_dim_shelter_care_begin, 1, 4)
+) %>%
+inner_join(
+  case_jurisdiction,
+  by = "id_case_dependency"
+) %>%
+inner_join(
+  scomis_location_codes,
+  by = "tx_court_code"
+) %>%
+select(
+  id_case_dependency,
+  id_removal_episode_fact,
+  tx_county_name,
+  tx_removal,
+  tx_shelter_care_entry_cohort,
+  id_calendar_dim_shelter_care_begin,
+  id_calendar_dim_episode_begin,
+  id_calendar_dim_dependency_petition,
+  alt_discharge_type
+)
+```
+
+
+```{r}
+
+shelter_care_events <- shelter_care_event_starts %>%
+left_join(
+  removal_episode_ends %>%
+    group_by(
+      id_removal_episode_fact
+    ) %>%
+    summarise(
+      id_calendar_dim_afcars_end = min(id_calendar_dim_afcars_end)
+    ),
+  by = c(
+    "id_removal_episode_fact"
+  )
+) %>%
+left_join(
+  dependency_start_events %>%
+    group_by(
+      id_case_dependency
+    ) %>%
+    summarise(
+      id_calendar_dim_dependency_start = min(id_calendar_dim_dependency_start)
+    ),
+  by = c(
+    "id_case_dependency"
+  )
+) %>%
+left_join(
+  shelter_care_events %>%
+    group_by(
+      id_case_dependency
+    ) %>%
+    summarise(
+      id_calendar_dim_shelter_care_hearing = min(id_calendar_dim_shelter_care_hearing)
+    ),
+  by = c(
+    "id_case_dependency"
+  )
+) %>% 
+left_join(
+  petition_dismissal_events %>%
+    group_by(
+      id_case_dependency
+    ) %>%
+    summarise(
+      id_calendar_dim_dismissal = min(id_calendar_dim_dismissal)
+    ),
+  by = "id_case_dependency"
+) %>%
+left_join(
+  dependency_end_events %>%
+    group_by(
+      id_case_dependency
+    ) %>%
+    summarise(
+      id_calendar_dim_dependency_end = min(id_calendar_dim_dependency_end)
+    ),
+  by = "id_case_dependency"
+) %>%
+left_join(
+  child_birthday_18 %>%
+    group_by(
+      id_case_dependency
+    ) %>%
+    summarise(
+      id_calendar_dim_birthday_18 = min(id_calendar_dim_birthday_18)
+    ),
+  by = "id_case_dependency"
+) %>%  
+mutate(
+  id_calendar_dim_birthday_18 = ifelse(
+    id_calendar_dim_birthday_18 <= ifelse(
+      params$use_all_data, 
+      dcyf_data_end, 
+      params$control_censor_date
+    ) & id_calendar_dim_birthday_18 <= id_calendar_dim_afcars_end,
+      id_calendar_dim_birthday_18,
+      NA
+  ),
+  id_calendar_dim_afcars_end_mod = case_when(
+    id_calendar_dim_afcars_end == 0 & params$use_all_data == TRUE ~ dcyf_data_end,
+    id_calendar_dim_afcars_end == 0 & params$use_all_data == FALSE ~ params$control_censor_date,
+    is.na(id_calendar_dim_afcars_end) ~ as.integer(99999999),
+    TRUE ~ id_calendar_dim_afcars_end
+  ),
+  id_calendar_dim_observation_end = min(
+    id_calendar_dim_birthday_18,
+    id_calendar_dim_afcars_end_mod,
+    id_calendar_dim_dismissal,
+    id_calendar_dim_dependency_end,
+    na.rm = TRUE
+  ),
+  id_calendar_dim_observation_end = case_when(
+    id_calendar_dim_observation_end == 99999999 & params$use_all_data == TRUE ~ dcyf_data_end, 
+    id_calendar_dim_observation_end == 99999999 & params$use_all_data == FALSE ~ params$control_censor_date, 
+    TRUE ~ as.integer(id_calendar_dim_observation_end)
+  ),
+  fl_episode_end_first = id_calendar_dim_afcars_end == id_calendar_dim_observation_end,
+  fl_18_first = id_calendar_dim_birthday_18 == id_calendar_dim_observation_end,
+  fl_dismissal_first = id_calendar_dim_dismissal == id_calendar_dim_observation_end,
+  fl_dependency_end_first = id_calendar_dim_dependency_end == id_calendar_dim_observation_end,
+  tx_discharge_type = case_when(
+    fl_18_first ~ 'Emancipation',
+    fl_episode_end_first ~ alt_discharge_type,
+    is.na(alt_discharge_type) & 
+      (fl_dismissal_first | fl_dependency_end_first) ~ 'Reunification', #implied reunification
+    is.na(fl_18_first) & 
+      is.na(fl_episode_end_first) &
+      is.na(fl_dismissal_first) &
+      is.na(fl_dependency_end_first) ~ 'Still In Care',
+    TRUE ~ alt_discharge_type
+  ),
+  tx_discharge_type_source = case_when(
+    fl_18_first ~ 'Child 18th Birthday',
+    fl_episode_end_first ~ 'Base Reporting Table with CSSAT Crosswalk',
+    is.na(alt_discharge_type) & 
+      (fl_dismissal_first | fl_dependency_end_first) ~ 'Implied Reunification from Dismissal', #implied reunification
+    is.na(fl_18_first) & 
+      is.na(fl_episode_end_first) &
+      is.na(fl_dismissal_first) &
+      is.na(fl_dependency_end_first) ~ 'No Observed End Dates',
+    TRUE ~ 'Base Reporting Table with CSSAT Crosswalk'
+  )
+) %>% 
+left_join(
+  person_ids_and_covariates %>%
+    group_by(
+      id_case_dependency,
+      dt_birth,
+      tx_braam_race,
+      tx_gndr
+    ) %>%
+    summarise(
+      id_person = max(id_prsn)
+    ),
+  by = c(
+    "id_case_dependency"
+  )
+) %>%
+mutate(
+  fl_minority = ifelse(tx_braam_race == "White", 0, 1)
+) %>% 
+dplyr::select(
+  id_case_dependency,
+  id_removal_episode_fact,
+  id_person,
+  dt_birth,
+  tx_braam_race,
+  fl_minority,
+  tx_gender = tx_gndr,
+  tx_county_name,
+  tx_removal,
+  tx_shelter_care_entry_cohort,
+  id_calendar_dim_shelter_care_begin,
+  id_calendar_dim_dependency_start,
+  id_calendar_dim_shelter_care_hearing,
+  id_calendar_dim_observation_end,
+  tx_discharge_type,
+  tx_discharge_type_source,
+  id_calendar_dim_episode_begin,
+  id_calendar_dim_dependency_petition,
+  id_calendar_dim_birthday_18,
+  id_calendar_dim_afcars_end,
+  id_calendar_dim_dismissal,
+  id_calendar_dim_dependency_end
+) 
+
+```
+
+Its about Time
+
+```{r}
+
+shelter_care_events_timed <- shelter_care_events %>%
+  mutate(
+    dt_placement_begin = as.Date(as.character(id_calendar_dim_episode_begin), "%Y%m%d"),
+    dt_petition_filed =  as.Date(as.character(id_calendar_dim_dependency_petition), "%Y%m%d"),
+    dt_shelter_care_begin = as.Date(as.character(id_calendar_dim_shelter_care_begin), "%Y%m%d"),
+    dt_dependency_begin = as.Date(as.character(id_calendar_dim_dependency_start), "%Y%m%d"),
+    dt_shelter_care_hearing = as.Date(as.character(id_calendar_dim_shelter_care_hearing), "%Y%m%d"),
+    dt_observation_end = as.Date(as.character(id_calendar_dim_observation_end), "%Y%m%d"),
+    age_at_shelter_care = as.double(difftime(dt_shelter_care_begin, dt_birth, units = "days"))/365.25,
+    age_at_shelter_care_days = as.double(difftime(dt_shelter_care_begin, dt_birth, units = "days")),
+    days_of_system_involvement = as.double(difftime(dt_observation_end, dt_shelter_care_begin, units = "days")),
+    age_at_exit_of_system_involvement_days = as.double(difftime(dt_observation_end, dt_birth, units = "days")),
+    age_at_18 = 365*18,
+    days_to_reunification = days_of_system_involvement,
+    days_to_guardianship = days_of_system_involvement,
+    days_to_adoption = days_of_system_involvement,
+    fl_18th_birthday_discharge = ifelse(
+      tx_discharge_type_source == "Child 18th Birthday",
+      1, 
+      0
+    ),
+    fl_reunification = ifelse(
+      tx_discharge_type == "Reunification",
+      1,
+      0
+    ),
+    fl_guardianship = ifelse(
+      tx_discharge_type == "Guardianship",
+      1,
+      0      
+    ),
+    fl_adoption = ifelse(
+      tx_discharge_type == "Adoption",
+      1,
+      0      
+    ), 
+    fl_over_12 = ifelse(age_at_shelter_care >= 12, 1, 0)
+  ) %>%
+  filter(#tx_shelter_care_entry_cohort < 2016, 
+         days_of_system_involvement >= 0
+         #tx_county_name %in% c("Lewis", "Grant"),
+         #!is.na(id_calendar_dim_dependency_start)
+         )
+
+feather::write_feather(shelter_care_events_timed, "data/shelter_care_events_timed_control.feather")
+
+
+# hist(shelter_care_events_timed$days_of_system_involvement/365.25)
+# 
+# shelter_care_events %>%
+#   group_by(tx_shelter_care_entry_cohort) %>%
+#   summarise(
+#     prop_open = sum(tx_discharge_type == "Still In Care", na.rm = TRUE)/n()
+#   ) %>%
+#   arrange(tx_shelter_care_entry_cohort)
+
+
+```

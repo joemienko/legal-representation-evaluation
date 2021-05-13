@@ -1,0 +1,329 @@
+---
+title: "Causal Inference"
+output: workflowr::wflow_html
+params:
+  control_censor_date: 20180228
+  control_start_date: 20150901
+  control_stop_date: 20170831
+  treatment_censor_date: 20200229
+  treatment_start_date: 20170901
+  treatment_stop_date: 20190831
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dagitty)
+library(ggdag)
+library(twang)
+library(ggplot2)
+library(ggpubr)
+library(survival)
+library(mstate)
+library(flexsurv)
+library(hesim)
+
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	#cache = TRUE, 
+	autodep = TRUE
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+con <- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = "ODBC Driver 17 for SQL Server",
+  Server = Sys.getenv("MSSQL_SERVER"),
+  Database = Sys.getenv("MSSQL_DB"),
+  UID = Sys.getenv("MSSQL_UN"),
+  PWD = Sys.getenv("MSSQL_PW"),
+  Port = Sys.getenv("MSSQL_PORT")
+)
+```
+
+```{sql, connection=con, output.var="dcyf_data_end_tbl", include=FALSE}
+select max(id_calendar_dim_begin) from base.rptPlacement;
+```
+
+```{r assign_dcyf_date, class.source="r", include=FALSE}
+dcyf_data_end <- as.integer(dcyf_data_end_tbl[1,1])
+```
+
+## Verifying thee Backdoor
+
+```{r cars}
+
+dag <- dagify(
+  H ~ R + S + L,
+  A ~ R,
+  S ~ R + A,
+  L ~ R + S + Y,
+  P ~ R + A + L + Y + H,
+  exposure = "L",
+  outcome = "P"
+)
+
+
+dag %>%
+  tidy_dagitty() %>% 
+  node_dconnected("L", "P", controlling_for = c("H", "R", "S", "A", "Y")) %>%
+  ggplot(aes(
+    x = x, 
+    y = y, 
+    xend = xend, 
+    yend = yend, 
+    shape = adjusted, 
+    col = d_relationship
+  ))  +
+    geom_dag_edges(aes(end_cap = ggraph::circle(10, "mm"))) +
+   # geom_dag_collider_edges() +
+    geom_dag_point() +
+    geom_dag_text(col = "white") +
+    theme_dag() + 
+    scale_adjusted() +
+    expand_plot(expand_y = expansion(c(0.2, 0.2))) +
+    scale_color_viridis_d(
+      name = "d-relationship", 
+      na.value = "grey85", 
+      begin = .35
+    ) 
+
+adjustmentSets(dag, "L", "P",  effect="total", type="all")
+
+```
+
+## Getting Propensity Model Data
+
+
+```{r read_files}
+
+shelter_care_events_timed <- feather::read_feather(
+  "~/legal-representation-evaluation/data/shelter_care_events_timed.feather"
+)
+
+shelter_care_events_timed_control <- feather::read_feather(
+  "~/legal-representation-evaluation/data/shelter_care_events_timed_control.feather"
+)
+```
+
+
+```{sql, connection=con, output.var="propensity_dat", include=FALSE}
+set nocount on
+
+IF OBJECT_ID('tempdb..##subject_referrals') IS NOT NULL
+    DROP TABLE ##subject_referrals;
+
+with subject_referrals_all as
+(
+select 
+    inf.id_intake_fact,
+    subject id_person_subject,
+    case
+        when tx_rel = 'Parent Birth/Adoptive' then 1
+        when tx_rel = 'Lgl Father (not bio/adpt/step)' then 2
+        when tx_rel = 'Alleged Birth Father' then 3
+        when tx_rel = 'Grandparent' then 4
+        when tx_rel = 'Relative Placement Provider' then 5
+        when tx_rel = 'Other Relative' then 6
+        when tx_rel like '%Partner' then 7
+        when tx_rel = 'Step Parent' then 8
+        when tx_rel = 'Reference Person' then 9
+    end rel_rank
+from base.rptintake_subjects ric
+    join dbo.intake_fact inf 
+        on ric.id_access_report = inf.id_access_report
+), subject_referrals_related as 
+(
+select 
+    max(rel_rank) max_rel_rank,
+    id_person_subject
+from subject_referrals_all
+group by 
+    id_person_subject
+)
+
+select 
+    id_intake_fact,
+    sra.id_person_subject
+into ##subject_referrals
+from subject_referrals_all sra 
+    join subject_referrals_related srr 
+        on sra.id_person_subject = srr.id_person_subject;
+
+IF OBJECT_ID('tempdb..##caretaker_info') IS NOT NULL
+    DROP TABLE ##caretaker_info;
+
+select
+    coalesce(mom_id, dad_id, id_person_subject) id_person_caretaker,
+    pd.DT_BIRTH,
+    id_removal_episode_fact
+into ##caretaker_info
+from base.rptPlacement rpc
+    left join ##subject_referrals sr 
+        on rpc.id_intake_fact = sr.id_intake_fact 
+    join dbo.people_dim pd 
+        on coalesce(mom_id, dad_id, id_person_subject) = pd.id_prsn
+            and pd.IS_CURRENT = 1;
+
+with children_on_referral as
+(
+select 
+    inf.id_intake_fact,
+    count(*) children_on_referral 
+from base.rptintake_children ric
+    join dbo.intake_fact inf 
+        on ric.id_access_report = inf.id_access_report
+group by 
+    inf.id_intake_fact
+), children_referrals as 
+(
+select 
+    inf.id_intake_fact,
+    county 
+from base.rptintake_children ric
+    join dbo.intake_fact inf 
+        on ric.id_access_report = inf.id_access_report
+), average_age_on_case as
+(
+select 
+    avg(datediff(yy, birthdate, removal_dt)) average_age_on_case,
+    id_case
+from base.rptPlacement 
+group by 
+    id_case
+)
+
+
+select distinct 
+    child_eps_rank child_eps_rank,
+    rpc.id_case id_case,
+    child id_person_child, 
+    rpc.id_removal_episode_fact id_removal_episode_fact,
+    children_on_referral children_on_referral,
+    average_age_on_case average_age_on_case,
+    datediff(yy, birthdate, removal_dt) age_at_removal,
+    case 
+        when rpc.tx_braam_race = 'Hispanic'
+        then 1
+        else 0
+    end fl_hispanic, 
+    case
+        when rpc.tx_braam_race = 'Native American'
+        then 1
+        else 0
+    end fl_native,
+    case 
+        when rpc.tx_braam_race = 'African American'
+        then 1
+        else 0
+    end fl_black,
+    case 
+        when rpc.tx_braam_race = 'Asian/PI'
+        then 1
+        else 0
+    end fl_asian, 
+    case 
+        when rpc.tx_braam_race = 'Other'
+        then 1
+        else 0
+    end fl_other,      
+    case 
+        when rpc.tx_braam_race = 'Unknown'
+        then 1
+        else 0
+    end fl_unknown,
+    id_person_caretaker id_person_caretaker,
+    datediff(yy, cin.DT_BIRTH, removal_dt) caretaker_age_at_removal,
+    year(removal_dt) year_of_removal        
+from base.rptPlacement rpc 
+    join children_on_referral cor 
+        on rpc.id_intake_fact = cor.id_intake_fact
+    join children_referrals chr
+        on rpc.id_intake_fact = chr.id_intake_fact
+    left join ##subject_referrals srf
+        on rpc.id_intake_fact = srf.id_intake_fact        
+    join average_age_on_case aac 
+        on rpc.id_case = aac.id_case
+    join ##caretaker_info cin
+        on rpc.id_removal_episode_fact = cin.id_removal_episode_fact
+where datediff(yy, cin.DT_BIRTH, removal_dt) is not null;
+```
+
+```{r more_wrangling}
+
+shelter_care_events_timed_filtered_treatment <- shelter_care_events_timed %>%
+  mutate(
+    fl_treatment_counties = ifelse(
+      tx_county_name %in% c("Lewis", "Grant"), 
+      1, 
+      0
+    ),
+    fl_similar_counties = ifelse(
+      tx_county_name %in% c("Adams", "Clallam", "Grays Harbor", "Mason"), 
+      1, 
+      0
+    ),
+    fl_leg_counties = ifelse(
+      tx_county_name %in% c("Whatcom", "Douglas"), 
+      1, 
+      0
+    ),       
+    post = 1
+  ) %>%
+  filter(
+    id_calendar_dim_shelter_care_begin >= params$treatment_start_date,
+    id_calendar_dim_shelter_care_begin <= params$treatment_stop_date,
+  )
+
+shelter_care_events_timed_filtered_control <- shelter_care_events_timed_control %>%
+  mutate(
+    fl_treatment_counties = ifelse(
+      tx_county_name %in% c("Lewis", "Grant"), 
+      1, 
+      0
+    ),
+    fl_similar_counties = ifelse(
+      tx_county_name %in% c("Adams", "Clallam", "Grays Harbor", "Mason"), 
+      1, 
+      0
+    ),
+    fl_leg_counties = ifelse(
+      tx_county_name %in% c("Whatcom", "Douglas"), 
+      1, 
+      0
+    ),    
+    pre = 1
+  ) %>%
+  filter(
+    id_calendar_dim_shelter_care_begin >= params$control_start_date,
+    id_calendar_dim_shelter_care_begin <= params$control_stop_date,
+  )
+
+shelter_care_events_timed_filtered <- bind_rows(
+  shelter_care_events_timed_filtered_control,
+  shelter_care_events_timed_filtered_treatment
+)
+
+
+feather::write_feather(
+  shelter_care_events_timed_filtered, 
+  "data/shelter_care_events_timed_filtered.feather"
+)
+
+feather::write_feather(
+  propensity_dat, 
+  "data/propensity_dat.feather"
+)
+
+```
+
+
+

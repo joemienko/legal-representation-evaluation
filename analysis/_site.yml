@@ -1,17 +1,28 @@
-name: "legal-representation-evaluation"
+name: DCLRE Data Exploration
 output_dir: ../docs
+include: .nojekyll
+exclude: include
 navbar:
-  title: "legal-representation-evaluation"
+  title: Dependent Child Legal Representation Evaluation
   left:
-  - text: Home
-    href: index.html
-  - text: About
-    href: about.html
-  - text: License
-    href: license.html
+    - text: Overview
+      href: index.html
+    - text: Setup
+      href: setup.html
+    - text: License
+      href: license.html
+  right:
+    - text: source
+      href: https://github.com/cssat/legal-representation-evaluation
 output:
   workflowr::wflow_html:
     toc: yes
     toc_float: yes
-    theme: cosmo
+    theme: readable
     highlight: textmate
+    code_folding: none
+    lib_dir: site_libs
+    self_contained: no
+    include:
+      before_body: include/header.html
+      after_body: include/footer.html

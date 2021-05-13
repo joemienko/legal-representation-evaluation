@@ -1,0 +1,15 @@
+---
+title: "DCLRE progress over the year"
+author: "Joe Mienko"
+output: workflowr::wflow_html
+---
+
+In this last analysis, I use the Divvy trip data to examine biking
+trends in Chicago over the course of one year. 
+
+```{r knitr-opts, include=FALSE}
+knitr::opts_chunk$set(comment = "#",collapse = TRUE)
+```
+
+I begin by loading a few packages, as well as some additional
+functions I wrote for this project.

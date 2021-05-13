@@ -1,0 +1,15 @@
+---
+title: "DCLRE usage by time-of-day"
+author: "Joe Mienko"
+output: workflowr::wflow_html
+---
+
+Here we use the Divvy trip data to examine biking trends over the
+course of a typical day in Chicago. 
+
+```{r knitr-opts, include=FALSE}
+knitr::opts_chunk$set(comment = "#",collapse = TRUE)
+```
+
+I begin by loading a few packages, as well as some additional
+functions I wrote for this project.

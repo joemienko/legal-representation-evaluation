@@ -1,0 +1,516 @@
+---
+title: "Dependent Child Legal Representation (DCLR) Cost Analysis"
+subtitle: "WORKING PAPER - PLEASE CONTACT AUTHOR BEFORE CITING"
+author:
+  - Joseph A. Mienko, PhD^[University of Washington School of Social Work, mienko@uw.edu]
+output: 
+ # hrbrthemes::ipsum_pdf
+  word_document
+params:
+  control_censor_date: 20180228
+  control_start_date: 20150901
+  control_stop_date: 20170831
+  treatment_censor_date: 20200229
+  treatment_start_date: 20170901
+  treatment_stop_date: 20190831
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dagitty)
+library(ggdag)
+library(twang)
+library(ggplot2)
+library(ggpubr)
+library(survival)
+library(mstate)
+library(flexsurv)
+library(hesim)
+library(hrbrthemes)
+library(ggplot2)
+library(Cairo)
+library(extrafont)
+library(googlesheets4)
+
+
+extrafont::loadfonts()
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	#cache = TRUE, 
+	autodep = TRUE,
+	dev = "cairo_pdf"	
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+con <- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = "ODBC Driver 17 for SQL Server",
+  Server = Sys.getenv("MSSQL_SERVER"),
+  Database = Sys.getenv("MSSQL_DB"),
+  UID = Sys.getenv("MSSQL_UN"),
+  PWD = Sys.getenv("MSSQL_PW"),
+  Port = Sys.getenv("MSSQL_PORT")
+)
+```
+
+```{sql, connection=con, output.var="dcyf_data_end_tbl", include=FALSE}
+select max(id_calendar_dim_begin) from base.rptPlacement;
+```
+
+```{r assign_dcyf_date, class.source="r", include=FALSE}
+dcyf_data_end <- as.integer(dcyf_data_end_tbl[1,1])
+```
+
+# Background
+
+When trying to understand the total cost of the child welfare system in the US, it is essential to consider all expenditures. The following graph illustrates that, on average, foster care does not drive the child welfare system's total costs; adoption subsidies account for most of the government's costs. In 2017, for example, 76 percent of all IV-E cases were adoption or guardianship cases. 
+
+```{r national_ive, echo=FALSE, fig.height=7, fig.width=9}
+national_caseloads <- read_sheet("https://docs.google.com/spreadsheets/d/1YKihsbmRD6wmfty2n0ey1zcX9kqpGqPo9FIk0JdAdiU/edit#gid=0") %>%
+  filter(
+    Measurement != 'Rate per 1,000 Children'
+  ) %>%
+  mutate(
+    Year = as.Date(lubridate::dmy(paste0('0101', Year)))
+  )
+
+total <- national_caseloads %>%
+  filter(Year == lubridate::ymd(20170101)) %>%
+  summarise(
+    total = sum(Value)
+  ) %>%
+  .$total
+
+total_adt <- national_caseloads %>%
+  dplyr::filter(Year == lubridate::ymd(20170101),
+         `Case Type` == "Adoption or Guardianship") %>%
+  .$Value
+
+#total_adt/total
+
+ks <- function (x) { scales::number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x) }
+
+ggplot(national_caseloads, aes(x = Year, y = Value, colour = `Case Type`, group =  `Case Type`)) +
+  geom_point() +
+  geom_smooth(se=F) + 
+  geom_vline(xintercept=lubridate::ymd(19970101), colour="black", linetype="dotted") +
+  annotate("text", x=lubridate::ymd(19970101), y=400000, label="\nASFA Signed", color = "black", angle=90) + 
+  facet_wrap(~ Measurement, scales = "free_y") + 
+  labs(title="National IV-E Caseloads", 
+       subtitle="Federal Fiscal Years 1984-2017",
+       caption="Source: 2018 House Ways and Means Committee Green Book") +
+  expand_limits(y = c(0,NA), x = c(lubridate::ymd(19840101), lubridate::ymd(20170101))) +
+  scale_y_continuous(labels = ks) + 
+  scale_x_date(date_labels="%Y",date_breaks  ="5 year") + 
+  scale_color_ipsum() +
+  theme_ipsum_rc(grid="XY") +
+  ylab("Count of IV-E Subsidy Cases") + 
+  xlab("") + 
+  theme(legend.position="bottom")
+
+```
+
+The difference between foster care and adoption cases results from the Adoption and Safe Families Act of 1997 (ASFA). Among other things, ASFA significantly incentivized adoptions compared to other forms of permanency or care. Specific costs associated with these caseloads are not currently available nationally or from Washington State. However, under current practices in Washington and most other states, on average, adoption will yield higher costs to the child welfare system than other forms of permanency. The cost difference is due to the state's adoption subsidy obligations (and guardianship subsidy obligations). Typically, the state makes adoption subsidy payments (and provides other support) for adopted children until adulthood. As such, cost savings for any program can come both from reducing time spent in out-of-home care and from increasing the likelihood of reunification as compared to adoption or subsidized guardianship. For DCLR, cost savings come from decreasing length of stay *and* increasing the likelihood of reunification relative to adoption or guardianship. Most of the savings are from the latter. 
+
+# Approach
+
+The rest of this paper provides a brief description of our DCLR analysis to date. We will provide a more detailed description of these and other cost analyses in our forthcoming evaluation report to the legislature. 
+
+The cost modeling portion of the DCLR evaluation adopted a health economics approach to assessing savings. Our work proceeded in three distinct phases. 
+
+**Phase 1** - We estimate an individual-level continuous-time state transition model to predict permanency outcomes based on our observations to date. 
+
+**Phase 2** - We use the models in Phase 1 to simulate what would happen to a typical child with two different policy strategies - the DCLR program and business as usual. 
+
+**Phase 3** - We estimate costs associated with the outcomes assessed in Phase 2 and summarize those costs to make it easier for policymakers to digest.  
+
+\newpage
+
+## Phase 1 and Phase 2
+
+The results of our Phase 1 analysis resulted in four different models. Here, we present a single model that best represents the legislature's original intent of comparing outcomes in the DCLR pilot counties (Lewis and Grant) with two selected comparison counties (Douglas and Whatcom). The other models yield similar results to this model. Specifically, after controlling for race, age, and other factors, children in the DCLR counties are expected to experience permanency more quickly than children who did not experience the DCLR program. We will provide more details on the differences between the four approaches in the final report. The expected time to each permanency outcome is displayed in the graph below. This graph is based on 100,000 simulated permanency outcomes based on the model we developed in Phase 1.
+
+```{r treatment_vs_treatment, include=FALSE}
+
+shelter_care_events_timed_filtered <- feather::read_feather("data/shelter_care_events_timed_filtered.feather")
+
+covs <- c("age", "minority", "strategy_id")
+
+episode_trans_times <- c(NA, "days_to_reunification", "days_to_guardianship", "days_to_adoption")
+
+episode_trans_states <- c(NA, "fl_reunification", "fl_guardianship", "fl_adoption") 
+
+treatment_vs_treatment <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = ifelse(id_calendar_dim_shelter_care_begin >= params$treatment_start_date, 2, 1),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   
+
+run_model_and_sim <- function(dat, iptw=FALSE, n = 1000){
+  tmat_episodes <- transMat(x = list(c(2, 3, 4), c(), c(), c()), 
+                          names = c("Sc", "Re", "Gd", "Ad"))
+  
+  dat_ms <- msprep(
+    data = as.data.frame(dat),
+    trans = tmat_episodes,
+    time = episode_trans_times,
+    status = episode_trans_states,
+    keep = covs) %>%
+    as.data.frame() %>%
+    mutate(
+      Tstop = Tstop + 1,
+      time = time + 1,
+    )
+  
+  n_trans <- max(tmat_episodes, na.rm = TRUE)
+  fits_gomp <- vector(mode = "list", length = n_trans)
+  dat_ms$years <- dat_ms$time/365.25
+  for (i in 1:n_trans){
+    
+    if (iptw) {
+      weights <- dat_ms %>% filter(trans == i) %>% .$IPTW
+    } else {
+      weights <- NULL
+    }
+    
+    fits_gomp[[i]] <- flexsurvreg(Surv(years, status) ~ factor(strategy_id) + 
+                                                     age + 
+                                                     minority + 
+                                                     factor(strategy_id):age ,
+                                  weights = weights,
+                         data = dat_ms %>% filter(trans == i),
+                         dist = "gompertz")
+  }
+
+
+  strategies <- data.frame(strategy_id = c(1, 2))
+  patients <- data.frame(patient_id = seq(1:(18*2)), age = rep(0:17, 2),
+                         grp_id = rep(0:17, 2),
+                            minority = c(rep(0, 18), rep(1, 18)))
+  states <- data.frame(state_id =  seq(1, 4))
+  colnames(tmat_episodes) <- rownames(tmat_episodes) <- c("Shelter Care", "Reunification", "Guardianship", "Adoption")
+  
+  transitions <- create_trans_dt(tmat_episodes) %>%
+    mutate(trans = factor(transition_id))
+  
+  hesim_dat <- hesim_data(strategies = strategies,
+                          patients = patients,
+                          states = states, 
+                          transitions = transitions)
+  
+  transmod_data <- expand(hesim_dat, 
+                          by = c("strategies", "patients", "transitions"))
+  
+  dismod <- create_IndivCtstmTrans(object = hesim::flexsurvreg_list(fits_gomp), 
+                                   input_data = transmod_data,
+                                   trans_mat = tmat_episodes,
+                                   clock = "forward",
+                                   point_estimate = FALSE,
+                                   n = n) 
+  
+  return(dismod)
+}
+
+treatment_vs_treatment_dismod <- run_model_and_sim(treatment_vs_treatment)
+
+get_total_costs <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+
+  ictstm$sim_disease()
+  
+  represented_care_day <- (1700/30) + 5
+  
+  care_day <- 1700/30
+  
+  adoption_day <- 22.4
+  
+  pr_guardianship_subsidy <- .05
+  
+  childhood_cost_summary <- ictstm$disprog_ %>%
+    as_data_frame() %>%
+    mutate(
+      age_at_exit = grp_id + time_stop,
+      years_of_permanency =  ifelse(18-age_at_exit < 0, 
+                                    0, 18-age_at_exit),
+      years_of_care = time_stop,
+      years_of_permanency_adoption = ifelse(to == 4, years_of_permanency, 0),
+      years_of_permanency_guardianship = ifelse(to == 3, years_of_permanency, 0),
+      years_of_permanency_reunification = ifelse(to == 2, years_of_permanency, 0)
+    ) %>%
+    group_by(
+      strategy_id
+    ) %>%
+    summarise(
+      years_of_care = sum(years_of_care),
+      years_of_adoption = sum(years_of_permanency_adoption),
+      years_of_guardianship = sum(years_of_permanency_guardianship),
+      years_of_reunification = sum(years_of_permanency_reunification)
+    ) %>%
+    mutate(
+      cost_of_care = case_when(
+        strategy_id == 1 ~ years_of_care*care_day,
+        strategy_id == 2 ~ years_of_care*represented_care_day
+      ),
+      cost_adoption = years_of_adoption*adoption_day,
+      cost_of_guardianship = years_of_guardianship*pr_guardianship_subsidy,
+      cost_of_reunification = 0,
+      total_cost = cost_of_care + cost_adoption + cost_of_guardianship + cost_of_reunification
+    )
+  
+  return(childhood_cost_summary)
+
+}
+
+nearest_10 <- scales::dollar_format(scale=1)
+
+cost_dat <- get_total_costs(treatment_vs_treatment) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        `Childhood Costs` = nearest_10(total_cost)
+         )
+
+  ggbarplot(cost_dat, "Condition", "total_cost",
+  fill = "Condition", color = "Condition", palette = "Paired",label = cost_dat$`Childhood Costs`,
+  position = position_dodge(0.9)) + 
+      scale_y_continuous(labels=scales::dollar_format()) + 
+    ylab("Total Childhood Costs") + xlab("")
+
+plot_sims <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  p <- dismod$sim_stateprobs(t = seq(0, 3, by = .1)) %>%
+  as_tibble() %>%
+  group_by(strategy_id, state_id, t) %>%
+  summarise(
+    prob = mean(prob)*18
+  ) %>%
+  filter(state_id != 1) %>% 
+  mutate(
+    strategy_id = ifelse(strategy_id == 1, "Business as Usual", "Universal Representation"),
+    state_id = case_when(
+      state_id == 2 ~ "Reunification", 
+      state_id == 3 ~ "Guardianship",
+      state_id == 4 ~ "Adoption"
+    )
+  ) %>%
+  ggplot(data = ., 
+         aes(x = t, y = prob, group = as.factor(state_id), colour = as.factor(state_id))) + 
+  geom_line() + 
+  facet_wrap(~ strategy_id) + 
+  theme_minimal() + 
+  ylab("Percentage In of Outcome") + 
+  xlab("Years Since Shelter Care") + 
+  scale_y_continuous(labels = scales::percent) + 
+    labs(colour = "Outcomes")
+
+
+ggpubr::ggpar(p,palette="nejm")
+
+}
+
+plot_sims(treatment_vs_treatment)
+
+plot_sims_by_age <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+  
+  ictstm$sim_disease()
+  
+  ictstm$disprog_ %>%
+    as_data_frame() %>%
+    group_by(strategy_id, to, grp_id) %>%
+    summarise(
+      time_to_permamency = mean(time_stop)
+    ) %>%
+  mutate(
+    strategy_id = ifelse(strategy_id == 1, "Business as Usual", "Universal Representation"),
+    to = case_when(
+      to == 2 ~ "Reunification", 
+      to == 3 ~ "Guardianship",
+      to == 4 ~ "Adoption"
+    )
+  ) %>%    
+    ggplot(data = ., 
+       aes(x = grp_id, y = time_to_permamency, group = as.factor(to), colour = as.factor(to))) + 
+        geom_line() + 
+        facet_wrap(~ strategy_id) + 
+      theme_minimal() + 
+  ylab("Years to Permamency") + 
+  xlab("Age at Shelter Care (Years)") + 
+    labs(colour = "Outcomes")
+}
+
+plot_sims_by_age(treatment_vs_treatment, n = 100000)
+
+get_average_los <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+  
+  ictstm$sim_disease()
+
+  ictstm$disprog_ %>%
+    as_data_frame() %>%
+    group_by(strategy_id, to) %>%
+    summarise(
+      time_to_permamency = round(mean(time_stop), 2)
+    )
+}
+
+# get_average_los(treatment_vs_treatment) %>%
+#   mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+#         Outcome = as.factor(case_when(
+#           to == 2 ~ "Reunification", 
+#           to == 3 ~ "Guardianship",
+#           to == 4 ~ "Adoption"
+#         )),
+#         
+#         `Time to Permanency` = time_to_permamency
+#          ) %>%
+#   ggbarplot(., "Outcome", "Time to Permanency",
+#   fill = "Condition", color = "Condition", palette = "Paired",
+#   label = TRUE,
+#   position = position_dodge(0.9))
+```
+
+
+```{r treatment_vs_control_leg_setup, echo=FALSE}
+
+treatment_vs_control_leg <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | fl_leg_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   
+
+treatment_vs_control_leg_dismod <- run_model_and_sim(treatment_vs_control_leg)
+
+#plot_sims(treatment_vs_control_leg)
+
+#plot_sims_by_age(treatment_vs_control_leg, n = 100000)
+```
+
+```{r treatment_vs_control_leg_los, echo=FALSE, fig.height=7, fig.width=9}
+
+get_average_los(treatment_vs_control_leg) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        Outcome = as.factor(case_when(
+          to == 2 ~ "Reunification", 
+          to == 3 ~ "Guardianship",
+          to == 4 ~ "Adoption"
+        )),
+        
+        `Time to Permanency` = time_to_permamency
+         ) %>%
+  ggplot(aes(x = Outcome, y = `Time to Permanency`, 
+             group = Condition, fill = Condition, 
+             colour = Condition)) +
+    geom_col(position = position_dodge(width = 1)) +
+    geom_text(aes(label=`Time to Permanency`), 
+              position = position_dodge(width = 0.9),vjust = -0.5
+                ) + 
+    labs(x="", y="Years to Permamency",
+       title="Expected Time to Permamency",
+       subtitle="Children in DCLR vs Business as Usual",
+       caption="Data taken from Superior Court Information Systems") + 
+  theme_ipsum(grid="Y") +
+  expand_limits(y = c(0,4)) +
+  scale_color_ipsum() +
+  scale_fill_ipsum() +
+    theme(legend.position="bottom") + 
+  theme(axis.text.y=element_blank())
+```
+\newpage
+
+## Phase 3
+
+Phase 1 and Phase 2 provided us with key information that will allow us to estimate the cumulative child welfare costs of a theoretical expansion of DCLR to a cohort of 50,000 children. We then compare these costs to caring for a cohort of 50,000 children under “business as usual”. Of course, Washington never has 50,000 children in care. There are, however, 10s of thousands of children on Washington’s IV-E caseload on any given day. Thus, we choose 50,000 children as a good order of magnitude to demonstrate the type of costs or savings attributable to DCLR. Additionally, we make the following assumptions about the costs associated with time in care and each permanency outcome. 
+
+**Care Day Costs** - Following the WSIPP approach to cost-benefit analysis, we adopt a low estimate of the cost of a care day focused on the direct variable costs related to foster care subsidies. Excluded from this number are staffing costs, facilities costs, etc. The Department of Children Youth and Families (DCYF) estimates this value at \$56.67 per day. We add $5 per care day for those care days associated with the DCLR program. We base this number on total program costs as reported by the Office of Civil Legal Aid. 
+
+**Adoption Day Costs** - Also, following values from the WSIP cost-benefit analysis model, we adopt an estimate of adoption day costs based solely on adoption subsidies. With inflation adjustment to numbers reported by WSIPP, we estimate an adoptive day cost to be \$22.40 per day. 
+
+**Likelihood of Guardianship Subsidy** - The analysis presented here relies solely on information from AOC/SCOMIS. These data do not provide information as to whether or not a particular guardianship outcome contains a subsidy. Using information from the congressional "Greenbook" cited above, we estimate the probability of a guardianship subsidy (across all guardianships and non-parental custody outcomes in our sample) to be 5%. 
+
+# Bottom Line
+
+Using these numbers, we estimate the cumulative costs over our simulated childhoods - both in care and out of care in the various predicted permanency outcomes to be \$5,288,802 for the DCLR program and \$6,519,115 for business as usual. These results are shown in the following graph. 
+
+
+
+```{r treatment_vs_control_leg_cost, echo=FALSE, fig.height=7, fig.width=9}
+
+cost_dat <- get_total_costs(treatment_vs_control_leg) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        `Childhood Costs` = nearest_10(total_cost)
+         )
+
+  ggplot(cost_dat, aes(x = Condition, y = total_cost)) +
+        geom_col(position = position_dodge(width = 1)) + 
+    geom_text(aes(label=`Childhood Costs`), 
+              position = position_dodge(width = 0.9),vjust = -0.5
+                ) + 
+    labs(x="", y="Childhood Child Welfare Costs",
+       title="Expected Cumulative Child Welfare Costs",
+       subtitle="Costs include time in foster care and ongoing costs after care",
+       caption="Data taken from Superior Court Information Systems") + 
+  theme_ipsum(grid="Y") +
+  expand_limits(y = c(0,7000000)) +
+  scale_color_ipsum() +
+  scale_fill_ipsum() +
+  theme(axis.text.y=element_blank())  +
+    theme(legend.position="bottom") 
+    
+    
+  
+```
+

@@ -1,0 +1,16 @@
+---
+title: "A first glance at the DCLRE data"
+author: "Joe Mienko"
+output: workflowr::wflow_html
+---
+
+Here, we will take a brief look at the data provided by Divvy.
+
+```{r knitr-opts, include=FALSE}
+knitr::opts_chunk$set(comment = "#",collapse = TRUE)
+```
+
+I begin by loading a few packages, as well as some additional
+functions I wrote for this project.
+
+test

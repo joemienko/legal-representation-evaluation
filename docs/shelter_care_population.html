@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Joe Mienko" />
+
+
+<title>Shelter Care Population</title>
+
+<script src="site_libs/header-attrs-2.6.6/header-attrs.js"></script>
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/readable.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.tab('show');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-sm-12 col-md-4 col-lg-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-sm-12 col-md-8 col-lg-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">Dependent Child Legal Representation Evaluation</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Overview</a>
+</li>
+<li>
+  <a href="setup.html">Setup</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/cssat/legal-representation-evaluation">source</a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Shelter Care Population</h1>
+<h4 class="author">Joe Mienko</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span> workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2021-02-22
+</p>
+<p>
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 4 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 3
+</p>
+<p>
+<strong>Knit directory:</strong> <code>legal-representation-evaluation/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
+</p>
+<p>
+This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.2). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R Markdown file created these results, you’ll want to first commit it to the Git repo. If you’re still working on the analysis, you can ignore this warning. When you’re finished, you can run <code>wflow_publish</code> to commit the R Markdown file and build the HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the global environment can affect the analysis in your R Markdown file in unknown ways. For reproduciblity it’s best to always run the code in an empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20210213code"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Seed:</strong> <code>set.seed(20210213)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20210213code" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20210213)</code> was run prior to running the code in the R Markdown file. Setting a seed ensures that any results that rely on randomness, e.g. subsampling or permutations, are reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Session information:</strong> recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongdetected"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>Cache:</strong> detected </a>
+</p>
+</div>
+<div id="strongCachestrongdetected" class="panel-collapse collapse">
+<div class="panel-body">
+The following chunks had caches available:
+<ul>
+<li>
+assign_dcyf_date
+</li>
+<li>
+join_files
+</li>
+<li>
+read_files
+</li>
+<li>
+session-info-chunk-inserted-by-workflowr
+</li>
+<li>
+unnamed-chunk-2
+</li>
+<li>
+unnamed-chunk-3
+</li>
+</ul>
+<p>To ensure reproducibility of the results, delete the cache directory <code>shelter_care_population_cache</code> and re-run the analysis. To have workflowr automatically delete the cache directory prior to building the file, set <code>delete_cache = TRUE</code> when running <code>wflow_build()</code> or <code>wflow_publish()</code>.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongabsolute"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>File paths:</strong> absolute </a>
+</p>
+</div>
+<div id="strongFilepathsstrongabsolute" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Using absolute paths to the files within your workflowr project makes it difficult for you and others to run your code on a different machine. Change the absolute path(s) below to the suggested relative path(s) to make your code more reproducible.
+</p>
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th style="text-align:left;">
+absolute
+</th>
+<th style="text-align:left;">
+relative
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/code/R/notin.R
+</td>
+<td style="text-align:left;">
+code/R/notin.R
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/filing_events.feather
+</td>
+<td style="text-align:left;">
+data/filing_events.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/removal_episode_starts.feather
+</td>
+<td style="text-align:left;">
+data/removal_episode_starts.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/removal_episode_ends.feather
+</td>
+<td style="text-align:left;">
+data/removal_episode_ends.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/case_jurisdiction.feather
+</td>
+<td style="text-align:left;">
+data/case_jurisdiction.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/child_dependency_episode.feather
+</td>
+<td style="text-align:left;">
+data/child_dependency_episode.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/petition_dismissal_events.feather
+</td>
+<td style="text-align:left;">
+data/petition_dismissal_events.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/dependency_end_events.feather
+</td>
+<td style="text-align:left;">
+data/dependency_end_events.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/termination_cases.feather
+</td>
+<td style="text-align:left;">
+data/termination_cases.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/child_birthday_18.feather
+</td>
+<td style="text-align:left;">
+data/child_birthday_18.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/dependency_start_events.feather
+</td>
+<td style="text-align:left;">
+data/dependency_start_events.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/shelter_care_events.feather
+</td>
+<td style="text-align:left;">
+data/shelter_care_events.feather
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+~/legal-representation-evaluation/data/person_ids_and_covariates.feather
+</td>
+<td style="text-align:left;">
+data/person_ids_and_covariates.feather
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong6c1d2a4"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 6c1d2a4 </a>
+</p>
+</div>
+<div id="strongRepositoryversionstrong6c1d2a4" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version 6c1d2a4. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    .env
+    Ignored:    analysis/.DS_Store
+    Ignored:    analysis/data_import_cache/
+    Ignored:    analysis/data_wrangling_cache/
+    Ignored:    analysis/shelter_care_population_cache/
+    Ignored:    analysis/shelter_care_population_control_cache/
+    Ignored:    code/.DS_Store
+    Ignored:    code/SQL/
+
+Untracked files:
+    Untracked:  .nojekyll
+    Untracked:  analysis/.nojekyll
+    Untracked:  analysis/causal_inference.Rmd
+    Untracked:  analysis/data_import.Rmd
+    Untracked:  analysis/data_wrangling.Rmd
+    Untracked:  analysis/first-glance.Rmd
+    Untracked:  analysis/include/
+    Untracked:  analysis/prop_model_XG.rds
+    Untracked:  analysis/seasonal-trends.Rmd
+    Untracked:  analysis/setup.Rmd
+    Untracked:  analysis/shelter_care_population.Rmd
+    Untracked:  analysis/shelter_care_population_control.Rmd
+    Untracked:  analysis/station-map.Rmd
+    Untracked:  analysis/time-of-day-trends.Rmd
+    Untracked:  code/R/
+    Untracked:  code/SPSS/
+    Untracked:  data/aoc/
+    Untracked:  data/case_jurisdiction.feather
+    Untracked:  data/child_birthday_18.feather
+    Untracked:  data/child_dependency_episode.feather
+    Untracked:  data/child_episode.feather
+    Untracked:  data/dependency_end_events.feather
+    Untracked:  data/dependency_start_events.feather
+    Untracked:  data/filing_events.feather
+    Untracked:  data/ospi/
+    Untracked:  data/person_ids.feather
+    Untracked:  data/person_ids_and_covariates.feather
+    Untracked:  data/petition_dismissal_events.feather
+    Untracked:  data/prop_model_XG.rds
+    Untracked:  data/prop_model_XG_ARSY.rds
+    Untracked:  data/removal_episode_ends.feather
+    Untracked:  data/removal_episode_starts.feather
+    Untracked:  data/shelter_care_events.feather
+    Untracked:  data/shelter_care_events_timed.feather
+    Untracked:  data/shelter_care_events_timed.featherr
+    Untracked:  data/shelter_care_events_timed_control.feather
+    Untracked:  data/termination_cases.feather
+
+Unstaged changes:
+    Modified:   .gitignore
+    Modified:   analysis/_site.yml
+    Deleted:    analysis/about.Rmd
+    Modified:   analysis/index.Rmd
+    Modified:   analysis/license.Rmd
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with <code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<div id="shelter-care-starts" class="section level3">
+<h3>Shelter Care Starts</h3>
+<pre class="r"><code>filing_events &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/filing_events.feather&quot;
+)
+
+removal_episode_starts &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/removal_episode_starts.feather&quot;
+)
+
+removal_episode_ends &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/removal_episode_ends.feather&quot;
+)
+
+case_jurisdiction &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/case_jurisdiction.feather&quot;
+)
+
+child_dependency_episode &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/child_dependency_episode.feather&quot;
+)
+
+petition_dismissal_events &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/petition_dismissal_events.feather&quot;
+)
+
+dependency_end_events &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/dependency_end_events.feather&quot;
+)
+
+termination_cases &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/termination_cases.feather&quot;
+)
+
+child_birthday_18 &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/child_birthday_18.feather&quot;
+)
+
+dependency_start_events &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/dependency_start_events.feather&quot;
+)
+
+shelter_care_events &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/shelter_care_events.feather&quot;
+)
+
+person_ids_and_covariates &lt;- feather::read_feather(
+  &quot;~/legal-representation-evaluation/data/person_ids_and_covariates.feather&quot;
+)
+
+scomis_location_codes &lt;- xml2::read_html(
+  &quot;https://www.courts.wa.gov/jislink/index.cfm?fa=jislink.codeview&amp;dir=clj_manual&amp;file=courts&quot;
+  ) %&gt;%
+  rvest::html_table(fill = TRUE) %&gt;%
+  .[[4]] %&gt;%
+  tail(-2) %&gt;%
+  mutate(
+    tx_county_name = stringr::str_extract(X2, &quot;.+?(?= County)&quot;)
+  ) %&gt;%
+  select(
+    tx_court_code = X1,
+    tx_county_name
+  )</code></pre>
+<pre class="r"><code>first_episodes &lt;- removal_episode_starts %&gt;%
+group_by(
+  id_removal_episode_fact,
+  tx_removal
+) %&gt;%
+summarise(
+  id_calendar_dim_episode_begin = min(id_calendar_dim_episode_begin)
+)
+
+first_filings &lt;- filing_events %&gt;%
+group_by(
+  id_case_dependency
+) %&gt;%
+summarise(
+  id_calendar_dim_dependency_petition = min(id_calendar_dim_dependency_petition)
+) %&gt;%
+filter(
+  id_case_dependency %notin% termination_cases$id_case_dependency
+)
+
+shelter_care_event_starts &lt;- first_filings %&gt;%
+left_join(
+  child_dependency_episode %&gt;%
+    select(
+      -id_calendar_dim_episode_begin
+    ),
+  by = &quot;id_case_dependency&quot;
+) %&gt;%
+left_join(
+  first_episodes,
+  by = &quot;id_removal_episode_fact&quot;
+) %&gt;%
+rowwise() %&gt;%
+mutate(
+  id_calendar_dim_min_petition_episode = case_when(
+    is.na(id_calendar_dim_dependency_petition) ~ id_calendar_dim_episode_begin,
+    is.na(id_calendar_dim_episode_begin) ~ id_calendar_dim_dependency_petition,
+    id_calendar_dim_episode_begin &gt; id_calendar_dim_dependency_petition ~ id_calendar_dim_dependency_petition,
+    id_calendar_dim_dependency_petition &gt; id_calendar_dim_episode_begin ~ id_calendar_dim_episode_begin,
+    id_calendar_dim_dependency_petition == id_calendar_dim_episode_begin ~ id_calendar_dim_episode_begin
+  ),
+  tx_removal = ifelse(is.na(tx_removal), &#39;NO REMOVAL&#39;, tx_removal),
+  id_calendar_dim_shelter_care_begin = ifelse(
+    tx_removal %in% c(&#39;VOLUNTARY&#39;, &#39;NO REMOVAL&#39;),
+    id_calendar_dim_dependency_petition,
+    id_calendar_dim_min_petition_episode
+  ), 
+  tx_shelter_care_source = case_when(
+    id_calendar_dim_shelter_care_begin == id_calendar_dim_dependency_petition ~ &quot;PETITION&quot;,
+    id_calendar_dim_shelter_care_begin == id_calendar_dim_episode_begin ~ &quot;REMOVAL&quot;
+  ),
+  tx_shelter_care_entry_cohort = substr(id_calendar_dim_shelter_care_begin, 1, 4)
+) %&gt;%
+inner_join(
+  case_jurisdiction,
+  by = &quot;id_case_dependency&quot;
+) %&gt;%
+inner_join(
+  scomis_location_codes,
+  by = &quot;tx_court_code&quot;
+) %&gt;%
+select(
+  id_case_dependency,
+  id_removal_episode_fact,
+  tx_county_name,
+  tx_removal,
+  tx_shelter_care_entry_cohort,
+  id_calendar_dim_shelter_care_begin,
+  id_calendar_dim_episode_begin,
+  id_calendar_dim_dependency_petition,
+  alt_discharge_type
+)</code></pre>
+<pre class="r"><code>shelter_care_events &lt;- shelter_care_event_starts %&gt;%
+left_join(
+  removal_episode_ends %&gt;%
+    group_by(
+      id_removal_episode_fact
+    ) %&gt;%
+    summarise(
+      id_calendar_dim_afcars_end = min(id_calendar_dim_afcars_end)
+    ),
+  by = c(
+    &quot;id_removal_episode_fact&quot;
+  )
+) %&gt;%
+left_join(
+  dependency_start_events %&gt;%
+    group_by(
+      id_case_dependency
+    ) %&gt;%
+    summarise(
+      id_calendar_dim_dependency_start = min(id_calendar_dim_dependency_start)
+    ),
+  by = c(
+    &quot;id_case_dependency&quot;
+  )
+) %&gt;%
+left_join(
+  shelter_care_events %&gt;%
+    group_by(
+      id_case_dependency
+    ) %&gt;%
+    summarise(
+      id_calendar_dim_shelter_care_hearing = min(id_calendar_dim_shelter_care_hearing)
+    ),
+  by = c(
+    &quot;id_case_dependency&quot;
+  )
+) %&gt;% 
+left_join(
+  petition_dismissal_events %&gt;%
+    group_by(
+      id_case_dependency
+    ) %&gt;%
+    summarise(
+      id_calendar_dim_dismissal = min(id_calendar_dim_dismissal)
+    ),
+  by = &quot;id_case_dependency&quot;
+) %&gt;%
+left_join(
+  dependency_end_events %&gt;%
+    group_by(
+      id_case_dependency
+    ) %&gt;%
+    summarise(
+      id_calendar_dim_dependency_end = min(id_calendar_dim_dependency_end)
+    ),
+  by = &quot;id_case_dependency&quot;
+) %&gt;%
+left_join(
+  child_birthday_18 %&gt;%
+    group_by(
+      id_case_dependency
+    ) %&gt;%
+    summarise(
+      id_calendar_dim_birthday_18 = min(id_calendar_dim_birthday_18)
+    ),
+  by = &quot;id_case_dependency&quot;
+) %&gt;%  
+mutate(
+  id_calendar_dim_birthday_18 = ifelse(
+    id_calendar_dim_birthday_18 &lt;= ifelse(
+      params$use_all_data, 
+      dcyf_data_end, 
+      params$treatment_censor_date
+    ) &amp; id_calendar_dim_birthday_18 &lt;= id_calendar_dim_afcars_end,
+      id_calendar_dim_birthday_18,
+      NA
+  ),
+  id_calendar_dim_afcars_end_mod = case_when(
+    id_calendar_dim_afcars_end == 0 &amp; params$use_all_data == TRUE ~ dcyf_data_end,
+    id_calendar_dim_afcars_end == 0 &amp; params$use_all_data == FALSE ~ params$treatment_censor_date,
+    is.na(id_calendar_dim_afcars_end) ~ as.integer(99999999),
+    TRUE ~ id_calendar_dim_afcars_end
+  ),
+  id_calendar_dim_observation_end = min(
+    id_calendar_dim_birthday_18,
+    id_calendar_dim_afcars_end_mod,
+    id_calendar_dim_dismissal,
+    id_calendar_dim_dependency_end,
+    na.rm = TRUE
+  ),
+  id_calendar_dim_observation_end = case_when(
+    id_calendar_dim_observation_end == 99999999 &amp; params$use_all_data == TRUE ~ dcyf_data_end, 
+    id_calendar_dim_observation_end == 99999999 &amp; params$use_all_data == FALSE ~ params$treatment_censor_date, 
+    TRUE ~ as.integer(id_calendar_dim_observation_end)
+  ),
+  fl_episode_end_first = id_calendar_dim_afcars_end == id_calendar_dim_observation_end,
+  fl_18_first = id_calendar_dim_birthday_18 == id_calendar_dim_observation_end,
+  fl_dismissal_first = id_calendar_dim_dismissal == id_calendar_dim_observation_end,
+  fl_dependency_end_first = id_calendar_dim_dependency_end == id_calendar_dim_observation_end,
+  tx_discharge_type = case_when(
+    fl_18_first ~ &#39;Emancipation&#39;,
+    fl_episode_end_first ~ alt_discharge_type,
+    is.na(alt_discharge_type) &amp; 
+      (fl_dismissal_first | fl_dependency_end_first) ~ &#39;Reunification&#39;, #implied reunification
+    is.na(fl_18_first) &amp; 
+      is.na(fl_episode_end_first) &amp;
+      is.na(fl_dismissal_first) &amp;
+      is.na(fl_dependency_end_first) ~ &#39;Still In Care&#39;,
+    TRUE ~ alt_discharge_type
+  ),
+  tx_discharge_type_source = case_when(
+    fl_18_first ~ &#39;Child 18th Birthday&#39;,
+    fl_episode_end_first ~ &#39;Base Reporting Table with CSSAT Crosswalk&#39;,
+    is.na(alt_discharge_type) &amp; 
+      (fl_dismissal_first | fl_dependency_end_first) ~ &#39;Implied Reunification from Dismissal&#39;, #implied reunification
+    is.na(fl_18_first) &amp; 
+      is.na(fl_episode_end_first) &amp;
+      is.na(fl_dismissal_first) &amp;
+      is.na(fl_dependency_end_first) ~ &#39;No Observed End Dates&#39;,
+    TRUE ~ &#39;Base Reporting Table with CSSAT Crosswalk&#39;
+  )
+) %&gt;% 
+left_join(
+  person_ids_and_covariates %&gt;%
+    group_by(
+      id_case_dependency,
+      dt_birth,
+      tx_braam_race,
+      tx_gndr
+    ) %&gt;%
+    summarise(
+      id_person = max(id_prsn)
+    ),
+  by = c(
+    &quot;id_case_dependency&quot;
+  )
+) %&gt;%
+mutate(
+  fl_minority = ifelse(tx_braam_race == &quot;White&quot;, 0, 1)
+) %&gt;% 
+dplyr::select(
+  id_case_dependency,
+  id_removal_episode_fact,
+  id_person,
+  dt_birth,
+  tx_braam_race,
+  fl_minority,
+  tx_gender = tx_gndr,
+  tx_county_name,
+  tx_removal,
+  tx_shelter_care_entry_cohort,
+  id_calendar_dim_shelter_care_begin,
+  id_calendar_dim_dependency_start,
+  id_calendar_dim_shelter_care_hearing,
+  id_calendar_dim_observation_end,
+  tx_discharge_type,
+  tx_discharge_type_source,
+  id_calendar_dim_episode_begin,
+  id_calendar_dim_dependency_petition,
+  id_calendar_dim_birthday_18,
+  id_calendar_dim_afcars_end,
+  id_calendar_dim_dismissal,
+  id_calendar_dim_dependency_end
+) </code></pre>
+<p>Its about Time</p>
+<pre class="r"><code>shelter_care_events_timed &lt;- shelter_care_events %&gt;%
+  mutate(
+    dt_placement_begin = as.Date(as.character(id_calendar_dim_episode_begin), &quot;%Y%m%d&quot;),
+    dt_petition_filed =  as.Date(as.character(id_calendar_dim_dependency_petition), &quot;%Y%m%d&quot;),
+    dt_shelter_care_begin = as.Date(as.character(id_calendar_dim_shelter_care_begin), &quot;%Y%m%d&quot;),
+    dt_dependency_begin = as.Date(as.character(id_calendar_dim_dependency_start), &quot;%Y%m%d&quot;),
+    dt_shelter_care_hearing = as.Date(as.character(id_calendar_dim_shelter_care_hearing), &quot;%Y%m%d&quot;),
+    dt_observation_end = as.Date(as.character(id_calendar_dim_observation_end), &quot;%Y%m%d&quot;),
+    age_at_shelter_care = as.double(difftime(dt_shelter_care_begin, dt_birth, units = &quot;days&quot;))/365.25,
+    age_at_shelter_care_days = as.double(difftime(dt_shelter_care_begin, dt_birth, units = &quot;days&quot;)),
+    days_of_system_involvement = as.double(difftime(dt_observation_end, dt_shelter_care_begin, units = &quot;days&quot;)),
+    age_at_exit_of_system_involvement_days = as.double(difftime(dt_observation_end, dt_birth, units = &quot;days&quot;)),
+    age_at_18 = 365*18,
+    days_to_reunification = days_of_system_involvement,
+    days_to_guardianship = days_of_system_involvement,
+    days_to_adoption = days_of_system_involvement,
+    fl_18th_birthday_discharge = ifelse(
+      tx_discharge_type_source == &quot;Child 18th Birthday&quot;,
+      1, 
+      0
+    ),
+    fl_reunification = ifelse(
+      tx_discharge_type == &quot;Reunification&quot;,
+      1,
+      0
+    ),
+    fl_guardianship = ifelse(
+      tx_discharge_type == &quot;Guardianship&quot;,
+      1,
+      0      
+    ),
+    fl_adoption = ifelse(
+      tx_discharge_type == &quot;Adoption&quot;,
+      1,
+      0      
+    ), 
+    fl_over_12 = ifelse(age_at_shelter_care &gt;= 12, 1, 0)
+  ) %&gt;%
+  filter(#tx_shelter_care_entry_cohort &lt; 2016, 
+         days_of_system_involvement &gt;= 0
+         #tx_county_name %in% c(&quot;Lewis&quot;, &quot;Grant&quot;),
+         #!is.na(id_calendar_dim_dependency_start)
+         )
+feather::write_feather(shelter_care_events_timed, &quot;data/shelter_care_events_timed.feather&quot;)
+
+
+# hist(shelter_care_events_timed$days_of_system_involvement/365.25)
+# 
+# shelter_care_events %&gt;%
+#   group_by(tx_shelter_care_entry_cohort) %&gt;%
+#   summarise(
+#     prop_open = sum(tx_discharge_type == &quot;Still In Care&quot;, na.rm = TRUE)/n()
+#   ) %&gt;%
+#   arrange(tx_shelter_care_entry_cohort)</code></pre>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span> Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.0.2 (2020-06-22)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS  10.16
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRblas.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] forcats_0.5.0   stringr_1.4.0   dplyr_1.0.3     purrr_0.3.4    
+[5] readr_1.4.0     tidyr_1.1.2     tibble_3.0.5    ggplot2_3.3.0  
+[9] tidyverse_1.3.0
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.0.6        lubridate_1.7.8   lattice_0.20-41   assertthat_0.2.1 
+ [5] rprojroot_2.0.2   digest_0.6.27     R6_2.5.0          cellranger_1.1.0 
+ [9] odbc_1.3.0        backports_1.2.1   reprex_0.3.0      evaluate_0.14    
+[13] httr_1.4.2        highr_0.8         pillar_1.4.7      rlang_0.4.10     
+[17] curl_4.3          readxl_1.3.1      rstudioapi_0.11   blob_1.2.1       
+[21] rmarkdown_2.6.6   selectr_0.4-2     feather_0.3.5     bit_1.1-15.2     
+[25] munsell_0.5.0     broom_0.5.6       compiler_4.0.2    httpuv_1.5.4     
+[29] modelr_0.1.7      xfun_0.20         pkgconfig_2.0.3   htmltools_0.5.1.1
+[33] tidyselect_1.1.0  workflowr_1.6.2   codetools_0.2-16  fansi_0.4.2      
+[37] crayon_1.3.4      dbplyr_2.0.0.9000 withr_2.4.1       later_1.1.0.1    
+[41] dotenv_1.0.2      grid_4.0.2        nlme_3.1-148      jsonlite_1.7.2   
+[45] gtable_0.3.0      lifecycle_0.2.0   DBI_1.1.0         git2r_0.27.1     
+[49] magrittr_2.0.1    scales_1.1.1      cli_2.2.0         stringi_1.5.3    
+[53] fs_1.4.1          promises_1.1.1    xml2_1.3.2        ellipsis_0.3.1   
+[57] generics_0.1.0    vctrs_0.3.6       tools_4.0.2       bit64_0.9-7      
+[61] glue_1.4.2        hms_1.0.0         yaml_2.2.1        colorspace_2.0-0 
+[65] rvest_0.3.5       knitr_1.31        haven_2.3.1      </code></pre>
+</div>
+</div>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+http://docs.mathjax.org/en/latest/configuration.html.  This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

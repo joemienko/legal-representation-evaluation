@@ -1,0 +1,2355 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+<meta name="author" content="Joe Mienko" />
+
+
+<title>Data Import</title>
+
+<script src="site_libs/header-attrs-2.6.6/header-attrs.js"></script>
+<script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/readable.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<script src="site_libs/kePrint-0.0.1/kePrint.js"></script>
+<link href="site_libs/lightable-0.0.1/lightable.css" rel="stylesheet" />
+
+<link rel="icon" href="https://github.com/workflowr/workflowr-assets/raw/master/img/reproducible.png">
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark it active
+  menuAnchor.tab('show');
+
+  // if it's got a parent navbar menu mark it active as well
+  menuAnchor.closest('li.dropdown').addClass('active');
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "&#xe258;";
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-sm-12 col-md-4 col-lg-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-sm-12 col-md-8 col-lg-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">Dependent Child Legal Representation Evaluation</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Overview</a>
+</li>
+<li>
+  <a href="setup.html">Setup</a>
+</li>
+<li>
+  <a href="license.html">License</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://github.com/cssat/legal-representation-evaluation">source</a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+<!-- Add a small amount of space between sections. -->
+<style type="text/css">
+div.section {
+  padding-top: 12px;
+}
+</style>
+
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Data Import</h1>
+<h4 class="author">Joe Mienko</h4>
+
+</div>
+
+
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-report" data-toggle="collapse" data-target="#workflowr-report">
+<span class="glyphicon glyphicon-list" aria-hidden="true"></span> workflowr <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span>
+</button>
+</p>
+<div id="workflowr-report" class="collapse">
+<ul class="nav nav-tabs">
+<li class="active">
+<a data-toggle="tab" href="#summary">Summary</a>
+</li>
+<li>
+<a data-toggle="tab" href="#checks"> Checks <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> </a>
+</li>
+<li>
+<a data-toggle="tab" href="#versions">Past versions</a>
+</li>
+</ul>
+<div class="tab-content">
+<div id="summary" class="tab-pane fade in active">
+<p>
+<strong>Last updated:</strong> 2021-05-13
+</p>
+<p>
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 5 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 2
+</p>
+<p>
+<strong>Knit directory:</strong> <code>legal-representation-evaluation/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
+</p>
+<p>
+This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis was created with <a
+  href="https://github.com/jdblischak/workflowr">workflowr</a> (version 1.6.2). The <em>Checks</em> tab describes the reproducibility checks that were applied when the results were created. The <em>Past versions</em> tab lists the development history.
+</p>
+<hr>
+</div>
+<div id="checks" class="tab-pane fade">
+<div id="workflowr-checks" class="panel-group">
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted changes </a>
+</p>
+</div>
+<div id="strongRMarkdownfilestronguncommittedchanges" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The R Markdown is untracked by Git. To know which version of the R Markdown file created these results, you’ll want to first commit it to the Git repo. If you’re still working on the analysis, you can ignore this warning. When you’re finished, you can run <code>wflow_publish</code> to commit the R Markdown file and build the HTML.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongEnvironmentstrongempty"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Environment:</strong> empty </a>
+</p>
+</div>
+<div id="strongEnvironmentstrongempty" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! The global environment was empty. Objects defined in the global environment can affect the analysis in your R Markdown file in unknown ways. For reproduciblity it’s best to always run the code in an empty environment.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSeedstrongcodesetseed20210213code"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Seed:</strong> <code>set.seed(20210213)</code> </a>
+</p>
+</div>
+<div id="strongSeedstrongcodesetseed20210213code" class="panel-collapse collapse">
+<div class="panel-body">
+<p>The command <code>set.seed(20210213)</code> was run prior to running the code in the R Markdown file. Setting a seed ensures that any results that rely on randomness, e.g. subsampling or permutations, are reproducible.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongSessioninformationstrongrecorded"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Session information:</strong> recorded </a>
+</p>
+</div>
+<div id="strongSessioninformationstrongrecorded" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Recording the operating system, R version, and package versions is critical for reproducibility.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongCachestrongdetected"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>Cache:</strong> detected </a>
+</p>
+</div>
+<div id="strongCachestrongdetected" class="panel-collapse collapse">
+<div class="panel-body">
+The following chunks had caches available:
+<ul>
+<li>
+import_aoc
+</li>
+<li>
+import_ospi
+</li>
+<li>
+load
+</li>
+<li>
+print_ref_lookup_cd_discharge_type_exits
+</li>
+<li>
+print_ref_lookup_county
+</li>
+<li>
+print_ref_lookup_plcmnt
+</li>
+<li>
+session-info-chunk-inserted-by-workflowr
+</li>
+<li>
+transform
+</li>
+<li>
+unnamed-chunk-1
+</li>
+<li>
+unnamed-chunk-2
+</li>
+<li>
+unnamed-chunk-3
+</li>
+</ul>
+<p>To ensure reproducibility of the results, delete the cache directory <code>data_import_cache</code> and re-run the analysis. To have workflowr automatically delete the cache directory prior to building the file, set <code>delete_cache = TRUE</code> when running <code>wflow_build()</code> or <code>wflow_publish()</code>.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongFilepathsstrongrelative"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>File paths:</strong> relative </a>
+</p>
+</div>
+<div id="strongFilepathsstrongrelative" class="panel-collapse collapse">
+<div class="panel-body">
+<p>Great job! Using relative paths to the files within your workflowr project makes it easier to run your code on other machines.</p>
+</div>
+</div>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading">
+<p class="panel-title">
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong6c1d2a4"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 6c1d2a4 </a>
+</p>
+</div>
+<div id="strongRepositoryversionstrong6c1d2a4" class="panel-collapse collapse">
+<div class="panel-body">
+<p>
+Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
+</p>
+<p>
+The results in this page were generated with repository version 6c1d2a4. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+</p>
+<p>
+Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
+</p>
+<pre><code>
+Ignored files:
+    Ignored:    .DS_Store
+    Ignored:    .Rhistory
+    Ignored:    .Rproj.user/
+    Ignored:    .env
+    Ignored:    analysis/.DS_Store
+    Ignored:    analysis/data_import_cache/
+    Ignored:    analysis/data_wrangling_cache/
+    Ignored:    analysis/shelter_care_population_cache/
+    Ignored:    analysis/shelter_care_population_control_cache/
+    Ignored:    code/.DS_Store
+    Ignored:    code/SQL/
+    Ignored:    cost_briefing_cache/
+
+Untracked files:
+    Untracked:  .nojekyll
+    Untracked:  analysis/.nojekyll
+    Untracked:  analysis/causal_inference.Rmd
+    Untracked:  analysis/causal_inference_jj.Rmd
+    Untracked:  analysis/causal_inference_permamency.Rmd
+    Untracked:  analysis/causal_inference_stability.Rmd
+    Untracked:  analysis/data_import.Rmd
+    Untracked:  analysis/data_wrangling.Rmd
+    Untracked:  analysis/first-glance.Rmd
+    Untracked:  analysis/include/
+    Untracked:  analysis/prop_model_XG.rds
+    Untracked:  analysis/seasonal-trends.Rmd
+    Untracked:  analysis/setup.Rmd
+    Untracked:  analysis/shelter_care_population.Rmd
+    Untracked:  analysis/shelter_care_population_control.Rmd
+    Untracked:  analysis/station-map.Rmd
+    Untracked:  analysis/time-of-day-trends.Rmd
+    Untracked:  code/R/
+    Untracked:  code/SPSS/
+    Untracked:  cost_briefing.Rmd
+    Untracked:  cost_briefing.pdf
+    Untracked:  cost_briefing_files/
+    Untracked:  data/aoc/
+    Untracked:  data/case_jurisdiction.feather
+    Untracked:  data/child_birthday_18.feather
+    Untracked:  data/child_dependency_episode.feather
+    Untracked:  data/child_episode.feather
+    Untracked:  data/dependency_end_events.feather
+    Untracked:  data/dependency_start_events.feather
+    Untracked:  data/filing_events.feather
+    Untracked:  data/national_caseloads.csv
+    Untracked:  data/ospi/
+    Untracked:  data/person_ids.feather
+    Untracked:  data/person_ids_and_covariates.feather
+    Untracked:  data/petition_dismissal_events.feather
+    Untracked:  data/prop_model_XG.rds
+    Untracked:  data/prop_model_XG_ARSY.rds
+    Untracked:  data/propensity_dat.feather
+    Untracked:  data/removal_episode_ends.feather
+    Untracked:  data/removal_episode_starts.feather
+    Untracked:  data/shelter_care_events.feather
+    Untracked:  data/shelter_care_events_timed.feather
+    Untracked:  data/shelter_care_events_timed.featherr
+    Untracked:  data/shelter_care_events_timed_control.feather
+    Untracked:  data/shelter_care_events_timed_filtered.feather
+    Untracked:  data/termination_cases.feather
+    Untracked:  downloadFigs4latex_final-clean/
+    Untracked:  final-clean.Rmd
+    Untracked:  final-clean.docx
+    Untracked:  final-clean.pdf
+    Untracked:  final.Rmd
+    Untracked:  final.pdf
+    Untracked:  final_files/
+    Untracked:  styles.docx
+
+Unstaged changes:
+    Modified:   .gitignore
+    Modified:   analysis/_site.yml
+    Deleted:    analysis/about.Rmd
+    Modified:   analysis/index.Rmd
+    Modified:   analysis/license.Rmd
+    Modified:   legal-representation-evaluation.Rproj
+
+</code></pre>
+<p>
+Note that any generated files, e.g. HTML, png, CSS, etc., are not included in this status report because it is ok for generated content to have uncommitted changes.
+</p>
+</div>
+</div>
+</div>
+</div>
+<hr>
+</div>
+<div id="versions" class="tab-pane fade">
+<p>
+There are no past versions. Publish this analysis with <code>wflow_publish()</code> to start tracking its development.
+</p>
+<hr>
+</div>
+</div>
+</div>
+<div id="preliminaries" class="section level2">
+<h2>Preliminaries</h2>
+<pre class="r"><code>library(tidyverse)
+
+knitr::opts_chunk$set(
+    echo = TRUE,
+    message = FALSE,
+    warning = FALSE, 
+    cache = TRUE, 
+    autodep = TRUE
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    &quot;/.env&quot;
+    )
+)
+
+con &lt;- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = &quot;ODBC Driver 17 for SQL Server&quot;,
+  Server = Sys.getenv(&quot;MSSQL_SERVER&quot;),
+  Database = Sys.getenv(&quot;MSSQL_DB&quot;),
+  UID = Sys.getenv(&quot;MSSQL_UN&quot;),
+  PWD = Sys.getenv(&quot;MSSQL_PW&quot;),
+  Port = Sys.getenv(&quot;MSSQL_PORT&quot;)
+)</code></pre>
+<p>This project assumes the existence of an available SQL Server specified by variables in an <code>.env</code> file in the root of the project. The chunk of code above sets those variables for the project environment and makes a connection to the SQL Server at the specified database.</p>
+</div>
+<div id="data-sources" class="section level2">
+<h2>Data Sources</h2>
+<p>There are three primary sources of data used for the quantitative analysis in this evaluation:</p>
+<ol style="list-style-type: decimal">
+<li><p>Data from Odyssey and other Superior Court information systems in the State obtained from the Administrative Office of the Courts (AOC),</p></li>
+<li><p>Data from FamLink, the transitional Comprehensive Child Welfare Information System (CCWIS) obtained from the Department of Children Youth and Families (DCYF), and</p></li>
+<li><p>Data from various systems maintained by the Office of the Superintendent of Public Instruction (OSPI).</p></li>
+</ol>
+<p>The following sections import these data, make some small transformations, and load the data onto the specified SQL Server.</p>
+<div id="import-aoc" class="section level3">
+<h3>Import AOC</h3>
+<p>The AOC files received for this study are imported using the code below. Where data are inconsistent, they are imported as strings using the <code>col_character()</code> transformation.</p>
+<p>The SAS CCRD file cannot be read into R. Neither can the SSPS file. As such, the file was pre-processed on a machine with SPSS in the PATH on a Windows Machine using <code>C:\&gt; stats ccrd.spj -prroduction silent</code>. The spj file and the sps file to facilitate this command are included in this repo at <code>~/code/SPSS/ccrd.spj</code>. Presumably, this could have just as easily been converted using a SAS script.</p>
+<pre class="r"><code>dep_case_docket &lt;- haven::read_sas(&quot;data/aoc/dep_case_docket.sas7bdat&quot;)
+dep_case_participant &lt;- haven::read_sas(&quot;data/aoc/dep_case_participant.sas7bdat&quot;)
+dep_case &lt;- haven::read_sas(&quot;data/aoc/dep_case.sas7bdat&quot;)
+famlink &lt;- haven::read_sas(&quot;data/aoc/famlink.sas7bdat&quot;)
+
+ccrd &lt;- read_csv(
+  file = &quot;data/aoc/ccrd.csv&quot;, 
+  col_types = cols(
+    .default = col_character(),
+    ResearchID = col_double(),
+    CcrdCaseID_x = col_double(),
+    CcrdLawSeverity = col_double(),
+    CcrdLawSexualMotivation = col_character(),
+    CcrdLawDeadlyWeapon = col_character(),
+    CcrdChargeNumber = col_double(),
+    CcrdChargeSeqNumber = col_double(),
+    CcrdCaseSDA = col_character()
+  )
+)</code></pre>
+</div>
+<div id="import-ospi" class="section level3">
+<h3>Import OSPI</h3>
+<p>The OSPI files received for this study are imported using the code below. Where data are inconsistent, they are imported as strings using the <code>col_character()</code> transformation.</p>
+<pre class="r"><code>ospi_absence &lt;- read_delim(
+  &quot;data/ospi/Absence_2013-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE,
+  col_types = cols(
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    DistrictName = col_character(),
+    SchoolCode = col_double(),
+    SchoolName = col_character(),
+    ResearchID = col_double(),
+    AbsenceDate = col_datetime(format = &quot;&quot;),
+    AbsenceCode = col_character(),
+    AbsenceDescription = col_character(),
+    SubmitDate = col_datetime(format = &quot;&quot;),
+    ExtractDate = col_datetime(format = &quot;&quot;)
+  )
+)
+
+ospi_discipline &lt;- read_delim(
+  &quot;data/ospi/Discipline_2014-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character(),
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    IncidentID = col_character(),
+    IncidentDate = col_datetime(format = &quot;&quot;),
+    BehaviorID = col_double(),
+    BehaviorCode = col_double(),
+    InterventionApplied = col_character(),
+    InterventionAppliedDescription = col_character(),
+    InterventionDate = col_character(),
+    NumInterventionDays = col_character(),
+    IAES = col_character(),
+    EmergencyExp = col_character(),
+    EEConversionDays = col_character(),
+    ExclusionaryActionType = col_double(),
+    ExclusionaryActionDate = col_datetime(format = &quot;&quot;),
+    ExclusionaryTotalTime = col_character()
+  )
+)
+
+ospi_district_level_programs &lt;- read_delim(
+  &quot;data/ospi/DistrictLevelPrograms_2010-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character(),
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    TitleIIINativeAmericanFlag = col_character(),
+    TitleIIINativeAmericanStartDate = col_character(),
+    TitleIIINativeAmericanExitDate = col_character(),
+    TitleIIINativeAmericanExitReasonCode = col_character(),
+    TitleIIINativeAmericanExitReason = col_character(),
+    TitleIIIImmigrantFlag = col_character(),
+    TitleIIIImmigrantStartDate = col_character(),
+    TitleIIIImmigrantExitDate = col_character(),
+    TitleIIIImmigrantExitReasonCode = col_character(),
+    TitleIIIImmigrantExitReason = col_character()
+  )
+)
+
+ospi_enroll_demographics &lt;- read_delim(
+  &quot;data/ospi/EnrollDemographic_2010-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+  .default = col_character(),
+  SchoolYear = col_double(),
+  DistrictCode = col_double(),
+  ResidentDistrictCode = col_double(),
+  SchoolCode = col_double(),
+  LocationID = col_character(),
+  ResearchID = col_double(),
+  SchoolChoiceCode = col_double(),
+  FederalEthRaceRollupCode = col_double(),
+  StudentPrimaryLanguageCode = col_double(),
+  LanguageSpokenAtHomeCode = col_character(),
+  GradRequirementsYear = col_character(),
+  ExpectedGradYear = col_character(),
+  CreditsAttempted = col_character(),
+  CreditsEarned = col_character(),
+  CumulativeDaysPresent = col_double(),
+  IsApprovedPrivateSchoolStudentAttendingPartTimeCode = col_character(),
+  IsHomeBasedStudentAttendingPartTimeCode = col_character()
+)
+)
+
+ospi_free_reduced_lunch &lt;- read_delim(
+  &quot;data/ospi/FreeReducedLunch_2010-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    DistrictName = col_character(),
+    SchoolCode = col_double(),
+    SchoolName = col_character(),
+    ResearchID = col_double(),
+    FreeReducedMealsFlag = col_character(),
+    FreeMealsFlag = col_character(),
+    ReducedMealsFlag = col_character(),
+    IncomeSurveyFlag = col_character(),
+    SubmitDate = col_character(),
+    ExtractDate = col_character()
+  )
+)
+
+
+ospi_school_level_programs &lt;- read_delim(
+  &quot;data/ospi/SchoolLevelPrograms_2010-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE,
+  col_types = cols(
+    .default = col_character(),
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    TruancyPetitionFiledinJuvenileCourtFlag = col_character(),
+    TruancyPetitionFiledinJuvenileCourtStartDate = col_character(),
+    TruancyPetitionFiledinJuvenileCourtExitDate = col_character(),
+    TruancyPetitionFiledinJuvenileCourtExitReasonCode = col_character(),
+    TruancyPetitionFiledinJuvenileCourtExitReason = col_character(),
+    TruancyReferraltoCommunityTruancyBoardFlag = col_character(),
+    TruancyReferraltoCommunityTruancyBoardStartDate = col_character(),
+    TruancyReferraltoCommunityTruancyBoardExitDate = col_character(),
+    TruancyReferraltoCommunityTruancyBoardExitReasonCode = col_character(),
+    TruancyReferraltoCommunityTruancyBoardExitReason = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionFlag = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionStartDate = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionExitDate = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionExitReasonCode = col_character(),
+    TruancyOtherCoordinatedMeansofInterventionExitReason = col_character(),
+    TruancyHearinginJuvenileCourtFlag = col_character()
+  )  
+)
+
+ospi_sgp_base &lt;- read_delim(
+  &quot;data/ospi/SGPBase_2012-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character(),
+    RecordNumber = col_double(),
+    DistrictCode = col_double(),
+    SchoolCode = col_double(),
+    ResearchID = col_double(),
+    ReadingSchoolCode = col_logical(),
+    MathSchoolCode = col_logical(),
+    ReportingGrade = col_character(),
+    RawScore = col_logical(),
+    BaselineSGPFlag = col_logical(),
+    EOC1Port = col_logical(),
+    CEState = col_logical(),
+    TestRepeat = col_logical()
+  )
+)
+
+ospi_sgp_cedars &lt;- read_delim(
+  &quot;data/ospi/SGPCEDARS_2012-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    RecordNumber = col_double(),
+    SchoolYear = col_character(),
+    IsBilingual = col_character(),
+    RaceEthnicity = col_character(),
+    RaceEthnicityCode = col_logical(),
+    IsLowIncome = col_character(),
+    IsGifted = col_character(),
+    IsHomeless = col_character(),
+    IsMigrant = col_character(),
+    IsSpecialEd = col_character()
+  )
+)
+
+ospi_special_education &lt;- read_delim(
+  &quot;data/ospi/SpecialEducation_2010-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    SchoolYear = col_double(),
+    DistrictCode = col_double(),
+    DistrictName = col_character(),
+    ResearchID = col_double(),
+    ReferralDate = col_character(),
+    InitialEligibilityDate = col_character(),
+    LastIEPReviewDate = col_character(),
+    LastEvaluationDate = col_character(),
+    SpecialEducationProgramStartDate = col_character(),
+    LRECode = col_double(),
+    LREName = col_character(),
+    ExitDate = col_character(),
+    ExitReasonCode = col_character(),
+    ExitReason = col_character(),
+    SubmitDate = col_character(),
+    ExtractDate = col_character()
+  )
+)
+
+ospi_wakids_base &lt;- read_delim(
+  &quot;data/ospi/WaKIDSBase_2012-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_double(),
+    SchoolYear = col_character(),
+    DistrictName = col_character(),
+    SchoolName = col_character(),
+    GenderTypeCode = col_character(),
+    SocialEmotionalDevelopmentLevel = col_character(),
+    SocialEmotionalReadinessFlag = col_character(),
+    SocialEmotionalCompletedAllObjectives = col_logical(),
+    PhysicalDevelopmentLevel = col_character(),
+    PhysicalReadinessFlag = col_character(),
+    PhysicalCompletedAllObjectives = col_logical(),
+    LanguageDevelopmentLevel = col_character(),
+    LanguageReadinessFlag = col_character(),
+    LanguageCompletedAllObjectives = col_logical(),
+    CognitiveDevelopmentLevel = col_character(),
+    CognitiveReadinessFlag = col_character(),
+    CognitiveCompletedAllObjectives = col_logical(),
+    LiteracyDevelopmentLEvel = col_character(),
+    LiteracyReadinessFlag = col_character(),
+    LiteracyCompletedAllObjectives = col_logical(),
+    MathDevelopmentLevel = col_character(), 
+    MathReadinessFlag = col_character(), 
+    SocialEmotionalRawScore = col_character(), 
+    SocialEmotionalScaleScore = col_character(), 
+    CognitiveRawScore = col_character(), 
+    CognitiveScaleScore = col_character(),
+    MathRawScore = col_character(),
+    MathScaleScore = col_character(), 
+    NumberofDomainsReadyforKindergarten = col_character(), 
+    NumberofDomainsComplete = col_character(), 
+    LanguageRawScore = col_character(),
+    LanguageScaleScore = col_character(), 
+    PhysicalRawScore = col_character(), 
+    PhysicalScaleScore = col_character(), 
+    LiteracyRawScore = col_character(), 
+    LiteracyScaleScore = col_character(),
+    PhysicalRawScore = col_character()      
+  )
+)
+
+ospi_wakids_cedars &lt;- read_delim(
+  &quot;data/ospi/WaKIDSCEDARS_2012-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    SchoolYear = col_character(),
+    RecordNumber = col_double(),
+    IsBilingual = col_character(),
+    RaceEthnicity = col_character(),
+    IsLowIncome = col_character(),
+    IsSpecialEd = col_character()
+  )
+)
+
+ospi_wakids_subscores &lt;- read_delim(
+  &quot;data/ospi/WaKIDSSubScores_2012-19.txt&quot;,
+  &quot;\t&quot;,
+  escape_double = FALSE,
+  trim_ws = TRUE, 
+  col_types = cols(
+    .default = col_character()
+  )
+)</code></pre>
+</div>
+</div>
+<div id="transform-data-in-r" class="section level2">
+<h2>Transform Data in R</h2>
+<p>A small number of mutations are performened on the AOC data before loading data to the specified SQL server.</p>
+<pre class="r"><code>dep_case_docket &lt;- dep_case_docket %&gt;% 
+  mutate(
+    docket_date = lubridate::ymd(docket_date_key),
+    docket_date_key = as.integer(docket_date_key)
+  )
+
+dep_case_participant &lt;- dep_case_participant %&gt;% 
+  mutate(
+    birth_date_key = ifelse(birth_date_key == 0, NA, birth_date_key),
+    birthdate = lubridate::ymd(birth_date_key), 
+    begin_effective_date = lubridate::ymd(begin_effective_date_key), 
+    end_effective_date = lubridate::ymd(end_effective_date_key),
+    birth_date_key = as.integer(birth_date_key),
+    begin_effective_date_key = as.integer(begin_effective_date_key),
+    end_effective_date_key = as.integer(end_effective_date_key)
+  )
+
+dep_case &lt;- dep_case %&gt;% 
+  mutate(
+    file_date = lubridate::ymd(file_date_key), 
+    resolution_date = lubridate::ymd(resolution_date_key), 
+    file_date = lubridate::ymd(file_date_key), 
+    file_date_key = as.integer(file_date_key),
+    resolution_date_key = as.integer(resolution_date_key),
+  )
+
+ccrd &lt;- ccrd %&gt;% 
+  mutate(
+    CcrdCaseFileDate_mod = lubridate::mdy(CcrdCaseFileDate),
+    CcrdSentenceDate_mod = lubridate::mdy(CcrdSentenceDate)
+  ) </code></pre>
+</div>
+<div id="load-data-to-sql-server" class="section level2">
+<h2>Load Data to SQL Server</h2>
+<p>Data are loaded onto the SQL server using the chunk of code below. Data are specifically loaded into a schema named <code>dclre</code>. This code chunk takes several minutes to run, and the code chunk parameter <code>eval</code> is set to <code>FALSE</code>. This should only be set to <code>TRUE</code> when you are certain you want to reubuild all tables in the schema.</p>
+<pre class="r"><code>odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.dep_case_docket&quot;),
+  value = dep_case_docket, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.dep_case_participant&quot;),
+  value = dep_case_participant, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.dep_case&quot;),
+  value = dep_case, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.famlink&quot;),
+  value = famlink, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ccrd&quot;),
+  value = ccrd %&gt;% select(-CcrdDispositionText), 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_discipline&quot;),
+  value = ospi_discipline, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_absence&quot;),
+  value = ospi_absence, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_district_level_programs&quot;),
+  value = ospi_district_level_programs, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_enroll_demographics&quot;),
+  value = ospi_enroll_demographics, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_free_reduced_lunch&quot;),
+  value = ospi_free_reduced_lunch, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_school_level_programs&quot;),
+  value = ospi_school_level_programs, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_sgp_base&quot;),
+  value = ospi_sgp_base, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_sgp_cedars&quot;),
+  value = ospi_sgp_cedars, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_special_education&quot;),
+  value = ospi_special_education, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_wakids_base&quot;),
+  value = ospi_wakids_base, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_wakids_cedars&quot;),
+  value = ospi_wakids_cedars, 
+  overwrite = TRUE
+)
+
+odbc::dbWriteTable(
+  conn = con, 
+  name = DBI::SQL(&quot;dclre.ospi_wakids_subscores&quot;),
+  value = ospi_wakids_subscores, 
+  overwrite = TRUE
+)</code></pre>
+</div>
+<div id="famlink-data-access" class="section level2">
+<h2>FamLink Data Access</h2>
+<p>This <code>dclre</code> schema used for this project, also contains views of FamLink Data Warehouse (FLDW) tables. The remainder of the analysis assumes access to the following FLDW tables and FamLink “base reporting tables” under the <code>dclre</code> schema.</p>
+<pre><code>-- LEGAL_FACT
+-- LEGAL_JURISDICTION_DIM
+-- LEGAL_ACTION_DIM
+-- LEGAL_RESULT_DIM
+-- PEOPLE_DIM
+-- rptPlacement_Events
+-- rptPlacement</code></pre>
+<p>Additionally, the following three crosswalk tables also exist in the <code>dclre</code> to assit in quickly coding placement types and permanency outcomes within the FamLink tables above.</p>
+<pre class="sql"><code>select * from dclre.ref_lookup_cd_discharge_type_exits;</code></pre>
+<pre class="r"><code>ref_lookup_cd_discharge_type_exits %&gt;% 
+  kableExtra::kable(
+    escape = FALSE, 
+    caption = &quot;ref_lookup_cd_discharge_type_exits&quot;
+  ) %&gt;%  
+  kableExtra::kable_classic(c(&quot;striped&quot;))</code></pre>
+<table class=" lightable-classic lightable-striped" style="font-family: &quot;Arial Narrow&quot;, &quot;Source Sans Pro&quot;, sans-serif; margin-left: auto; margin-right: auto;">
+<caption>
+ref_lookup_cd_discharge_type_exits
+</caption>
+<thead>
+<tr>
+<th style="text-align:right;">
+cd_discharge_type
+</th>
+<th style="text-align:left;">
+discharge_type
+</th>
+<th style="text-align:left;">
+alt_discharge_type
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:left;">
+All Outcomes
+</td>
+<td style="text-align:left;">
+Still In Care
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Reunification
+</td>
+<td style="text-align:left;">
+Reunification
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Adoption
+</td>
+<td style="text-align:left;">
+Adoption
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+Guardianship
+</td>
+<td style="text-align:left;">
+Guardianship
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+Emancipation
+</td>
+<td style="text-align:left;">
+Emancipation
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Other
+</td>
+<td style="text-align:left;">
+Other
+</td>
+</tr>
+</tbody>
+</table>
+<pre class="sql"><code>select * from dclre.ref_lookup_county;</code></pre>
+<pre class="r"><code>ref_lookup_county %&gt;% 
+  kableExtra::kable(
+    escape = FALSE, 
+    caption = &quot;ref_lookup_county&quot;
+  ) %&gt;%  
+  kableExtra::kable_classic(c(&quot;striped&quot;))</code></pre>
+<table class=" lightable-classic lightable-striped" style='font-family: "Arial Narrow", "Source Sans Pro", sans-serif; margin-left: auto; margin-right: auto;'>
+<caption>
+ref_lookup_county
+</caption>
+<thead>
+<tr>
+<th style="text-align:right;">
+county_cd
+</th>
+<th style="text-align:left;">
+county_desc
+</th>
+<th style="text-align:right;">
+cd_region
+</th>
+<th style="text-align:right;">
+old_region_cd
+</th>
+<th style="text-align:left;">
+old_region_desc
+</th>
+<th style="text-align:right;">
+countyfips
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+-99
+</td>
+<td style="text-align:left;">
+<ul>
+<li></td>
+<td style="text-align:right;">
+-99
+</td>
+<td style="text-align:right;">
+-99
+</td>
+<td style="text-align:left;">
+<ul>
+<li></td>
+<td style="text-align:right;">
+NA
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:left;">
+All
+</td>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:left;">
+<ul>
+<li></td>
+<td style="text-align:right;">
+53
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Adams
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53001
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Asotin
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53003
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Benton
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Region 2
+</td>
+<td style="text-align:right;">
+53005
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+Chelan
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53007
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+Clallam
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53009
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Clark
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53011
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:left;">
+Columbia
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Region 2
+</td>
+<td style="text-align:right;">
+53013
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+8
+</td>
+<td style="text-align:left;">
+Cowlitz
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53015
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+9
+</td>
+<td style="text-align:left;">
+Douglas
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53017
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+10
+</td>
+<td style="text-align:left;">
+Ferry
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53019
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+11
+</td>
+<td style="text-align:left;">
+Franklin
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Region 2
+</td>
+<td style="text-align:right;">
+53021
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+12
+</td>
+<td style="text-align:left;">
+Garfield
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53023
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+13
+</td>
+<td style="text-align:left;">
+Grant
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53025
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+14
+</td>
+<td style="text-align:left;">
+Grays Harbor
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53027
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+15
+</td>
+<td style="text-align:left;">
+Island
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Region 3
+</td>
+<td style="text-align:right;">
+53029
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+16
+</td>
+<td style="text-align:left;">
+Jefferson
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53031
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+17
+</td>
+<td style="text-align:left;">
+King
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+Region 4
+</td>
+<td style="text-align:right;">
+53033
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+18
+</td>
+<td style="text-align:left;">
+Kitsap
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+Region 5
+</td>
+<td style="text-align:right;">
+53035
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+19
+</td>
+<td style="text-align:left;">
+Kittitas
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Region 2
+</td>
+<td style="text-align:right;">
+53037
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+20
+</td>
+<td style="text-align:left;">
+Klickitat
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Region 2
+</td>
+<td style="text-align:right;">
+53039
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+21
+</td>
+<td style="text-align:left;">
+Lewis
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53041
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+22
+</td>
+<td style="text-align:left;">
+Lincoln
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53043
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+23
+</td>
+<td style="text-align:left;">
+Mason
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53045
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+24
+</td>
+<td style="text-align:left;">
+Okanogan
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53047
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+25
+</td>
+<td style="text-align:left;">
+Pacific
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53049
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+26
+</td>
+<td style="text-align:left;">
+Pend Oreille
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53051
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+27
+</td>
+<td style="text-align:left;">
+Pierce
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+Region 5
+</td>
+<td style="text-align:right;">
+53053
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+28
+</td>
+<td style="text-align:left;">
+San Juan
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Region 3
+</td>
+<td style="text-align:right;">
+53055
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+29
+</td>
+<td style="text-align:left;">
+Skagit
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Region 3
+</td>
+<td style="text-align:right;">
+53057
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+30
+</td>
+<td style="text-align:left;">
+Skamania
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53059
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+31
+</td>
+<td style="text-align:left;">
+Snohomish
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Region 3
+</td>
+<td style="text-align:right;">
+53061
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+32
+</td>
+<td style="text-align:left;">
+Spokane
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53063
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+33
+</td>
+<td style="text-align:left;">
+Stevens
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53065
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+34
+</td>
+<td style="text-align:left;">
+Thurston
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53067
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+35
+</td>
+<td style="text-align:left;">
+Wahkiakum
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Region 6
+</td>
+<td style="text-align:right;">
+53069
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+36
+</td>
+<td style="text-align:left;">
+Walla Walla
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Region 2
+</td>
+<td style="text-align:right;">
+53071
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+37
+</td>
+<td style="text-align:left;">
+Whatcom
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Region 3
+</td>
+<td style="text-align:right;">
+53073
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+38
+</td>
+<td style="text-align:left;">
+Whitman
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:left;">
+Region 1
+</td>
+<td style="text-align:right;">
+53075
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+39
+</td>
+<td style="text-align:left;">
+Yakima
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:left;">
+Region 2
+</td>
+<td style="text-align:right;">
+53077
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+40
+</td>
+<td style="text-align:left;">
+Other/Out of State
+</td>
+<td style="text-align:right;">
+999
+</td>
+<td style="text-align:right;">
+-99
+</td>
+<td style="text-align:left;">
+<ul>
+<li></td>
+<td style="text-align:right;">
+NA
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+999
+</td>
+<td style="text-align:left;">
+State Level Location
+</td>
+<td style="text-align:right;">
+-99
+</td>
+<td style="text-align:right;">
+-99
+</td>
+<td style="text-align:left;">
+<ul>
+<li></td>
+<td style="text-align:right;">
+NA
+</td>
+</tr>
+</tbody>
+</table></li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul></li>
+</ul>
+<pre class="sql"><code>select * from dclre.ref_lookup_plcmnt;</code></pre>
+<pre class="r"><code>ref_lookup_plcmnt %&gt;% 
+  kableExtra::kable(
+    escape = FALSE, 
+    caption = &quot;ref_lookup_plcmnt&quot;
+  ) %&gt;%
+  kableExtra::kable_classic(c(&quot;striped&quot;))</code></pre>
+<table class=" lightable-classic lightable-striped" style="font-family: &quot;Arial Narrow&quot;, &quot;Source Sans Pro&quot;, sans-serif; margin-left: auto; margin-right: auto;">
+<caption>
+ref_lookup_plcmnt
+</caption>
+<thead>
+<tr>
+<th style="text-align:right;">
+cd_plcm_setng
+</th>
+<th style="text-align:left;">
+tx_plcm_setng
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right;">
+0
+</td>
+<td style="text-align:left;">
+All
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+3
+</td>
+<td style="text-align:left;">
+Shelter
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+4
+</td>
+<td style="text-align:left;">
+Foster
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+5
+</td>
+<td style="text-align:left;">
+Group
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+6
+</td>
+<td style="text-align:left;">
+Kin
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+7
+</td>
+<td style="text-align:left;">
+Other
+</td>
+</tr>
+</tbody>
+</table>
+<br>
+<p>
+<button type="button" class="btn btn-default btn-workflowr btn-workflowr-sessioninfo" data-toggle="collapse" data-target="#workflowr-sessioninfo" style="display: block;">
+<span class="glyphicon glyphicon-wrench" aria-hidden="true"></span> Session information
+</button>
+</p>
+<div id="workflowr-sessioninfo" class="collapse">
+<pre class="r"><code>sessionInfo()</code></pre>
+<pre><code>R version 4.0.2 (2020-06-22)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS  10.16
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRblas.dylib
+LAPACK: /Library/Frameworks/R.framework/Versions/4.0/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] forcats_0.5.0   stringr_1.4.0   dplyr_1.0.3     purrr_0.3.4    
+[5] readr_1.4.0     tidyr_1.1.2     tibble_3.0.5    ggplot2_3.3.0  
+[9] tidyverse_1.3.0
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.0.6        lubridate_1.7.8   lattice_0.20-41   assertthat_0.2.1 
+ [5] rprojroot_2.0.2   digest_0.6.27     R6_2.5.0          cellranger_1.1.0 
+ [9] odbc_1.3.0        backports_1.2.1   reprex_0.3.0      evaluate_0.14    
+[13] httr_1.4.2        pillar_1.4.7      rlang_0.4.10      readxl_1.3.1     
+[17] rstudioapi_0.11   blob_1.2.1        rmarkdown_2.6.6   bit_1.1-15.2     
+[21] munsell_0.5.0     broom_0.5.6       compiler_4.0.2    httpuv_1.5.4     
+[25] modelr_0.1.7      xfun_0.20         pkgconfig_2.0.3   htmltools_0.5.1.1
+[29] tidyselect_1.1.0  workflowr_1.6.2   codetools_0.2-16  fansi_0.4.2      
+[33] crayon_1.3.4      dbplyr_2.0.0.9000 withr_2.4.1       later_1.1.0.1    
+[37] dotenv_1.0.2      grid_4.0.2        nlme_3.1-148      jsonlite_1.7.2   
+[41] gtable_0.3.0      lifecycle_0.2.0   DBI_1.1.0         git2r_0.27.1     
+[45] magrittr_2.0.1    scales_1.1.1      cli_2.2.0         stringi_1.5.3    
+[49] fs_1.4.1          promises_1.1.1    xml2_1.3.2        ellipsis_0.3.1   
+[53] generics_0.1.0    vctrs_0.3.6       tools_4.0.2       bit64_0.9-7      
+[57] glue_1.4.2        hms_1.0.0         yaml_2.2.1        colorspace_2.0-0 
+[61] rvest_0.3.5       knitr_1.31        haven_2.3.1      </code></pre>
+</div>
+</div>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+<!-- Adjust MathJax settings so that all math formulae are shown using
+TeX fonts only; see
+http://docs.mathjax.org/en/latest/configuration.html.  This will make
+the presentation more consistent at the cost of the webpage sometimes
+taking slightly longer to load. Note that this only works because the
+footer is added to webpages before the MathJax javascript. -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    "HTML-CSS": { availableFonts: ["TeX"] }
+  });
+</script>
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

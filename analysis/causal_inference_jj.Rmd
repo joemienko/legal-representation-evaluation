@@ -1,0 +1,305 @@
+---
+title: "Causal Inference"
+output: workflowr::wflow_html
+params:
+  control_censor_date: 20180228
+  control_start_date: 20150901
+  control_stop_date: 20160229
+  treatment_censor_date: 20200229
+  treatment_start_date: 20170901
+  treatment_stop_date: 20180301
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dagitty)
+library(ggdag)
+library(twang)
+library(ggplot2)
+library(ggpubr)
+library(survival)
+library(mstate)
+library(flexsurv)
+library(hesim)
+library(lubridate)
+
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	#cache = TRUE, 
+	autodep = TRUE
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+con <- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = "ODBC Driver 17 for SQL Server",
+  Server = Sys.getenv("MSSQL_SERVER"),
+  Database = Sys.getenv("MSSQL_DB"),
+  UID = Sys.getenv("MSSQL_UN"),
+  PWD = Sys.getenv("MSSQL_PW"),
+  Port = Sys.getenv("MSSQL_PORT")
+)
+```
+
+```{sql, connection=con, output.var="dcyf_data_end_tbl", include=FALSE}
+select max(id_calendar_dim_begin) from base.rptPlacement;
+```
+
+```{r assign_dcyf_date, class.source="r", include=FALSE}
+dcyf_data_end <- as.integer(dcyf_data_end_tbl[1,1])
+```
+
+```{sql, connection=con, output.var="placement_events", include=FALSE}
+select 
+    rpe.id_removal_episode_fact,
+    rpe.id_placement_fact,
+    rpe.id_calendar_dim_begin,
+    rpe.id_calendar_dim_end,
+    rlp.tx_plcm_setng
+from base.rptPlacement_Events rpe
+    join dbo.ref_lookup_plcmnt rlp
+        on rpe.prtl_cd_plcm_setng = rlp.cd_plcm_setng
+```
+
+```{r shelter_care_with_placements, class.source="r", include=FALSE}
+shelter_care_events_timed_filtered <- feather::read_feather("~/legal-representation-evaluation/data/shelter_care_events_timed_filtered.feather")
+
+placement_events_stability <- shelter_care_events_timed_filtered %>%
+  inner_join(
+    placement_events,
+    by = "id_removal_episode_fact"
+  ) %>%
+  # shelter care events that I have at least 730 days of observation for. 
+  filter(
+    (id_calendar_dim_shelter_care_begin >= params$control_start_date & 
+      id_calendar_dim_shelter_care_begin <= params$control_stop_date
+     ) | 
+    (
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & 
+      id_calendar_dim_shelter_care_begin <= params$treatment_stop_date
+    )
+  ) %>%
+  mutate(
+    dt_placement_event_begin = lubridate::ymd(id_calendar_dim_begin),
+    dt_placement_event_end = case_when(
+      id_calendar_dim_shelter_care_begin >= params$control_start_date & 
+      id_calendar_dim_shelter_care_begin <= params$control_stop_date & 
+        id_calendar_dim_end == 0 ~ lubridate::ymd(params$control_censor_date), 
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & 
+      id_calendar_dim_shelter_care_begin <= params$treatment_stop_date & 
+        id_calendar_dim_end == 0 ~ lubridate::ymd(params$treatment_censor_date),   
+      id_calendar_dim_shelter_care_begin >= params$control_start_date & 
+      id_calendar_dim_shelter_care_begin <= params$control_stop_date &
+        id_calendar_dim_end > params$control_censor_date ~ lubridate::ymd(params$control_censor_date),
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & 
+      id_calendar_dim_shelter_care_begin <= params$treatment_stop_date &
+        id_calendar_dim_end > params$control_censor_date ~ lubridate::ymd(params$treatment_censor_date),
+      TRUE ~ lubridate::ymd(id_calendar_dim_end)
+    ),
+    days_in_placement = dt_placement_event_end - dt_placement_event_begin,
+    placement_interval = lubridate::interval(dt_placement_event_begin, dt_placement_event_end),
+    dt_shelter_care_75 = dt_shelter_care_begin + lubridate::days(75),
+    dt_shelter_care_76 = dt_shelter_care_begin + lubridate::days(76),
+    dt_shelter_care_365 = dt_shelter_care_begin + lubridate::days(365),
+    dt_shelter_care_730 = dt_shelter_care_begin + lubridate::days(730),
+    early_interval = lubridate::interval(dt_placement_event_begin, dt_shelter_care_75),
+    late_interval = lubridate::interval(dt_shelter_care_76, dt_shelter_care_365),
+    fl_in_early = dt_placement_event_begin %within% early_interval,
+    fl_in_late = dt_placement_event_begin %within% late_interval,
+  ) %>%
+  # filter(
+  #   id_calendar_dim_begin <= id_calendar_dim_observation_end,
+  #   id_calendar_dim_begin >= id_calendar_dim_shelter_care_begin
+  # ) %>%
+  select(
+    id_case_dependency,
+    id_removal_episode_fact,
+    dt_shelter_care_begin,
+    dt_observation_end,
+    days_in_placement,
+    dt_placement_event_begin,
+    dt_shelter_care_75,
+    dt_shelter_care_365,
+    dt_shelter_care_730,
+    fl_in_early,
+    fl_in_late ,  
+    # fl_in_at_730,
+    # fl_in_at_365,
+    # 
+    # fl_start_after_75,
+    # fl_start_before_365,
+    tx_plcm_setng
+  )
+  
+
+
+```
+
+# Treatment vs Treatment
+
+```{r treatment_vs_treatment}
+
+shelter_care_events_timed_filtered <- feather::read_feather("~/legal-representation-evaluation/data/shelter_care_events_timed_filtered.feather")
+
+covs <- c("age", "minority", "strategy_id")
+
+episode_trans_times <- c(NA, "days_to_reunification", "days_to_guardianship", "days_to_adoption")
+
+episode_trans_states <- c(NA, "fl_reunification", "fl_guardianship", "fl_adoption") 
+
+treatment_vs_treatment_early <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1,
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$treatment_stop_date),ymd(params$treatment_censor_date)), 
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$control_stop_date),ymd(params$control_censor_date)) 
+  ) %>%
+  left_join(
+    placement_events_stability %>%
+    filter(
+      fl_in_early, 
+     # fl_start_after_75 == 1,  
+    #  fl_start_before_365 == 1,
+      days_in_placement >= 9*30
+    ),
+    by = c("id_case_dependency", "id_removal_episode_fact")
+  ) %>%
+  mutate(
+    fl_strategy = ifelse(id_calendar_dim_shelter_care_begin >= params$treatment_start_date, 1, 0),
+    fl_early_stability = case_when(
+      !is.na(fl_in_early) ~ 1, 
+      is.na(id_removal_episode_fact) ~ 1,
+      days_of_system_involvement <= 75 & tx_discharge_type != "Still In Care" ~ 1,
+      TRUE ~ 0
+    ),   
+    tx_early_stability = case_when(
+      !is.na(fl_in_early) ~ tx_plcm_setng, 
+      is.na(id_removal_episode_fact) ~ 'No Placement',
+      days_of_system_involvement <= 75 & tx_discharge_type != "Still In Care" ~ 'Permanency',
+      TRUE ~ 'No Early Stability'
+    ), 
+    fct_early_stability = as.factor(tx_early_stability), 
+    fct_early_stability = relevel(fct_early_stability, ref = 'No Early Stability')
+    )
+
+treatment_vs_treatment_late <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1,
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$treatment_stop_date),ymd(params$treatment_censor_date)), 
+    !ymd(id_calendar_dim_shelter_care_begin) %within% interval(ymd(params$control_stop_date),ymd(params$control_censor_date)) 
+  ) %>%
+  left_join(
+    placement_events_stability %>%
+    filter(
+      fl_in_late, 
+      days_in_placement >= 9*30
+    ),
+    by = c("id_case_dependency", "id_removal_episode_fact")
+  ) %>%
+  mutate(
+    fl_strategy = ifelse(id_calendar_dim_shelter_care_begin >= params$treatment_start_date, 1, 0),
+    fl_late_stability = case_when(
+      !is.na(fl_in_late) ~ 1, 
+      days_of_system_involvement <= 75 & tx_discharge_type != "Still In Care" ~ 1,
+      TRUE ~ 0
+    ),   
+    tx_late_stability = case_when(
+      !is.na(fl_in_late) ~ tx_plcm_setng, 
+      days_of_system_involvement > 75 & days_of_system_involvement <= 365 & tx_discharge_type != "Still In Care" ~ 'Permanency',
+      TRUE ~ 'No Late Stability'
+    ), 
+    fct_late_stability = as.factor(tx_late_stability), 
+    fct_late_stability = relevel(fct_late_stability, ref = 'No Late Stability')
+    )
+
+
+library(nnet)
+
+
+summary(glm(fl_early_stability ~ fl_strategy +
+      age_at_shelter_care_days + 
+      fl_minority, 
+    data = treatment_vs_treatment_early))
+
+summary(multinom(fct_early_stability ~ fl_strategy + age_at_shelter_care_days + 
+      fl_minority, data = treatment_vs_treatment_early))
+
+summary(glm(fl_late_stability ~ fl_strategy +
+      age_at_shelter_care_days + 
+      fl_minority + age_at_shelter_care_days*fl_strategy, 
+    data = treatment_vs_treatment_late))
+
+summary(multinom(fct_late_stability ~ fl_strategy + age_at_shelter_care_days + 
+      fl_minority, data = treatment_vs_treatment_late))
+
+
+
+
+```
+
+# Treatment vs Control Leg
+
+```{r treatment_vs_control_leg}
+treatment_vs_control_leg <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | fl_leg_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   
+
+
+```
+
+# Treatment vs Control RWJ
+
+```{r treatment_vs_control_rwj}
+treatment_vs_control_similar <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | fl_similar_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   
+
+```

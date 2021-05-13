@@ -1,0 +1,792 @@
+---
+#output: 
+# hrbrthemes::ipsum_pdf
+output: word_document
+params:
+  control_censor_date: 20180228
+  control_start_date: 20150901
+  control_stop_date: 20170831
+  treatment_censor_date: 20200229
+  treatment_start_date: 20170901
+  treatment_stop_date: 20190831
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(knitr)
+library(flextable)
+
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(survival)
+library(survminer)
+library(mstate)
+library(hesim)
+library(flexsurv)
+library(hrbrthemes)
+library(Cairo)
+library(extrafont)
+library(googlesheets4)
+
+library(gtsummary)
+
+extrafont::loadfonts()
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	#cache = TRUE, 
+	autodep = TRUE,
+	dev = "cairo_pdf"	
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+
+
+```
+
+```{r function_definitions, include=FALSE}
+Tstop <- NULL
+fl_minority <- NULL
+age_at_shelter_care <- NULL
+
+shelter_care_events_timed_filtered <- feather::read_feather("data/shelter_care_events_timed_filtered.feather") %>%
+    mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(
+      fl_minority == 1, 1, 2
+    ),
+    grp_name = ifelse(
+      fl_minority == 1, "Minority", "Non-Minority"
+    ),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & 
+        fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    fl_treatment_period = ifelse(id_calendar_dim_shelter_care_begin >= params$treatment_start_date, 
+                             1, 0),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  )
+
+covs <- c("age", "minority", "strategy_id", "fl_treatment_period", "fl_treatment_counties")
+
+episode_trans_times <- c(NA, "days_to_reunification", "days_to_guardianship", "days_to_adoption")
+
+episode_trans_states <- c(NA, "fl_reunification", "fl_guardianship", "fl_adoption") 
+
+tmat_episodes <- transMat(x = list(c(2, 3, 4), c(), c(), c()), 
+                        names = c("Sc", "Re", "Gd", "Ad"))
+
+run_model_and_sim <- function(dat, iptw=FALSE, n = 1000, tmat = NULL){
+  
+  
+dat_ms <- msprep(
+  data = as.data.frame(dat),
+  trans = tmat_episodes,
+  time = episode_trans_times,
+  status = episode_trans_states,
+  keep = covs) %>%
+  as.data.frame() %>%
+  mutate(
+    Tstop = Tstop + 1,
+    time = time + 1,
+  )
+  
+  trans <- NULL
+  transition_id <- NULL
+  . <- NULL
+  
+
+  n_trans <- max(tmat, na.rm = TRUE)
+  fits_gomp <- vector(mode = "list", length = n_trans)
+  dat_ms$years <- dat_ms$time/365.25
+  
+  for (i in 1:n_trans) {
+    if (iptw) {
+      weights <- dat_ms %>% filter(trans == i) %>% .$IPTW
+    } else {
+      weights <- NULL
+    }
+    
+    fits_gomp[[i]] <- flexsurvreg(
+      Surv(years, status) ~ factor(strategy_id) +
+        age + 
+        minority + 
+        fl_treatment_period + 
+        fl_treatment_counties + 
+        factor(strategy_id):age,
+      weights = weights,
+      data = dat_ms %>% filter(trans == i),
+      dist = "gompertz")
+  }
+
+
+  strategies <- data.frame(
+    strategy_id = c(1, 2, 1, 1),
+    fl_treatment_period = c(0, 1, 0, 1),
+    fl_treatment_counties = c(0, 0, 0, 0)
+  )
+  patients <- data.frame(
+    patient_id = seq(1:(18*2)), 
+    age = rep(0:17, 2),
+    grp_id = rep(0:17, 2),
+    minority = c(rep(0, 18), rep(1, 18))
+  )
+  states <- data.frame(
+    state_id =  seq(1, 4)
+  )
+  colnames(tmat_episodes) <- rownames(tmat_episodes) <- c(
+    "Shelter Care", 
+    "Reunification", 
+    "Guardianship", 
+    "Adoption"
+  )
+  
+  transitions <- create_trans_dt(tmat_episodes) %>%
+    mutate(trans = factor(transition_id))
+  
+  hesim_dat <- hesim_data(strategies = strategies,
+                          patients = patients,
+                          states = states, 
+                          transitions = transitions)
+  
+  transmod_data <- expand(
+    hesim_dat, 
+    by = c("strategies", "patients", "transitions"), 
+    times = NULL
+  )
+  
+  output <- list(
+    fits_gomp = fits_gomp,
+    dismod = create_IndivCtstmTrans(
+    object = hesim::flexsurvreg_list(fits_gomp), 
+    input_data = transmod_data,
+    trans_mat = tmat_episodes,
+    clock = "forward",
+    point_estimate = FALSE,
+    n = n
+  )
+  )
+  
+  # dismod <- create_IndivCtstmTrans(
+  #   object = hesim::flexsurvreg_list(fits_gomp), 
+  #   input_data = transmod_data,
+  #   trans_mat = tmat_episodes,
+  #   clock = "forward",
+  #   point_estimate = FALSE,
+  #   n = n
+  # ) 
+  
+  return(output)
+
+}
+
+# treatment_vs_treatment_dismod <- run_model_and_sim(treatment_vs_treatment, tmat = tmat_episodes)
+
+get_total_costs <- function(dat, n = 1000, tmat = NULL){
+  
+  dismod <- run_model_and_sim(
+    dat, 
+    n = n,
+    tmat = tmat
+  )
+  
+  ictstm <- IndivCtstm$new(
+    trans_model = dismod
+  )
+
+  ictstm$sim_disease()
+  
+  represented_care_day <- (1700/30) + 5
+  
+  care_day <- 1700/30
+  
+  adoption_day <- 22.4
+  
+  pr_guardianship_subsidy <- .05
+  
+  childhood_cost_summary <- ictstm$disprog_ %>%
+    as_data_frame() %>%
+    mutate(
+      age_at_exit = grp_id + time_stop,
+      years_of_permanency =  ifelse(18-age_at_exit < 0, 
+                                    0, 18-age_at_exit),
+      years_of_care = time_stop,
+      years_of_permanency_adoption = ifelse(to == 4, years_of_permanency, 0),
+      years_of_permanency_guardianship = ifelse(to == 3, years_of_permanency, 0),
+      years_of_permanency_reunification = ifelse(to == 2, years_of_permanency, 0)
+    ) %>%
+    group_by(
+      strategy_id
+    ) %>%
+    summarise(
+      years_of_care = sum(years_of_care),
+      years_of_adoption = sum(years_of_permanency_adoption),
+      years_of_guardianship = sum(years_of_permanency_guardianship),
+      years_of_reunification = sum(years_of_permanency_reunification)
+    ) %>%
+    mutate(
+      cost_of_care = case_when(
+        strategy_id == 1 ~ years_of_care*care_day,
+        strategy_id == 2 ~ years_of_care*represented_care_day
+      ),
+      cost_adoption = years_of_adoption*adoption_day,
+      cost_of_guardianship = years_of_guardianship*pr_guardianship_subsidy,
+      cost_of_reunification = 0,
+      total_cost = cost_of_care + cost_adoption + cost_of_guardianship + cost_of_reunification
+    )
+  
+  return(childhood_cost_summary)
+
+}
+
+nearest_10 <- scales::dollar_format(scale=1)
+
+plot_sims <- function(dat, n = 1000, tmat = NULL){
+  
+  dismod_out <- run_model_and_sim(dat, n = n, tmat = tmat)
+
+  dismod <- dismod_out$dismod
+  
+  p <- dismod$sim_stateprobs(t = seq(0, 3, by = .1)) %>%
+  as_tibble() %>%
+  group_by(strategy_id, state_id, t) %>%
+  summarise(
+    prob = mean(prob)*18
+  ) %>%
+  filter(state_id != 1) %>% 
+  mutate(
+    strategy_id = ifelse(strategy_id == 1, "Business as Usual", "Universal Representation"),
+    state_id = case_when(
+      state_id == 2 ~ "Reunification", 
+      state_id == 3 ~ "Guardianship",
+      state_id == 4 ~ "Adoption"
+    )
+  ) %>%
+  ggplot(data = ., 
+         aes(x = t, y = prob, group = as.factor(state_id), colour = as.factor(state_id))) + 
+  geom_line() + 
+  facet_wrap(~ strategy_id) + 
+  theme_minimal() + 
+  ylab("Percentage In of Outcome") + 
+  xlab("Years Since Shelter Care") + 
+  scale_y_continuous(labels = scales::percent) + 
+    labs(colour = "Outcomes")
+
+
+ggpubr::ggpar(p,palette="nejm")
+
+}
+
+plot_sims_by_age <- function(dat, n = 1000, tmat = NULL){
+  
+  dismod_out <- run_model_and_sim(dat, n = n, tmat = tmat)
+  
+  dismod <- dismod_out$dismod
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+  
+  ictstm$sim_disease()
+  
+  ictstm$disprog_ %>%
+    as_data_frame() %>%
+    group_by(strategy_id, to, grp_id) %>%
+    summarise(
+      time_to_permamency = mean(time_stop)
+    ) %>%
+  mutate(
+    strategy_id = ifelse(strategy_id == 1, "Business as Usual", "Universal Representation"),
+    to = case_when(
+      to == 2 ~ "Reunification", 
+      to == 3 ~ "Guardianship",
+      to == 4 ~ "Adoption"
+    )
+  ) %>%    
+    ggplot(data = ., 
+       aes(x = grp_id, y = time_to_permamency, group = as.factor(to), colour = as.factor(to))) + 
+        geom_line() + 
+        facet_wrap(~ strategy_id) + 
+      theme_minimal() + 
+  ylab("Years to Permamency") + 
+  xlab("Age at Shelter Care (Years)") + 
+    labs(colour = "Outcomes")
+}
+
+get_average_los <- function(dat, n = 1000, tmat = NULL){
+  
+  dismod_out <- run_model_and_sim(dat, n = n, tmat = tmat)
+  dismod <- dismod_out$dismod
+  
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+  
+  ictstm$sim_disease()
+
+  ictstm$disprog_ %>%
+    as_data_frame() %>%
+    group_by(strategy_id, to) %>%
+    summarise(
+      time_to_permamency = round(mean(time_stop), 2)
+    )
+}
+
+```
+
+# Method
+
+## Sample
+
+As noted above, the legislature required the evaluation team compare the pilot counties (Lewis and Grant) in which DCLR was offered universally to all children entering shelter care, with two explicitly identified comparison counties (Whatcom and Douglas). These counties served as the baseline DCLR and “business-as-usual” (BAU) samples for all analyses. Depending on the outcome, we refined the sample for practical reasons (e.g., only a subset of dependent children (i.e., adolescent children) are realistically at risk of juvenile justice outcomes) or for sensitivity analysis to confirm the validity of the legislatively chosen comparison groups. We outline our qualitative and quantitative samples in more detail below.  
+
+### Focus Groups & Qualitative Samples
+
+Qualitative samples were 
+
+### Quantitative Samples
+
+#### Shelter Care in Washington State
+
+Our baseline quantitative sample focuses on children entering a period of shelter care. In Washington State, shelter care begins by one of two mechanisms (RCW 13.34.060):
+
+1. A law enforcement officer takes a child into custody, finding "...probable cause to believe that the child is abused or neglected and that the child would be injured or could not be taken into custody if it were necessary to first obtain a court order." (RCW 26.44.050),  or 
+
+2. A court orders the child into custody, finding that there are "...reasonable grounds to believe the child is dependent and that the child's health, safety, and welfare will be seriously endangered if not taken into custody." (RCW 13.34.050). 
+
+Under the first mechanism, shelter care begins when the child enters custody. Under the second mechanism, shelter care starts with the court order, regardless of whether the child is actually in state custody. 
+
+#### Quantitative Sampling Considerations for DCLR and BAU
+
+To estimate the effect of DCLR on various outcomes, we need to find an appropriate comparison group for the children in the DCLR condition. We attempted four different approaches to define our BAU condition. 
+
+1. **Pre-Post**: We compared children in the DCLR condition (Lewis and Grant county shelter care events from September 1, 2017, through August 31, 2019 (i.e., hereafter, our “treatment period”)) with children entering care in Lewis and Grant in the preceding two-year period (September 1, 2015, through August 31, 2017 (i.e., hereafter, our “control period”)). 
+
+2. **Approximate Difference-in-Differences (aDID) (Legislatively Required)**: We compared children in the DCLR condition with children entering shelter care in Lewis, Grant, Douglas, and Whatcom in the control period or Douglas and Whatcom in the treatment period. Our approach is similar to the Difference-in-Differences (DID) approach made famous by Card and Kruger (1994). There are, however, critical statistical differences between the models used to develop DID (i.e., ordinary least squares) and the models and samples we use in this evaluation. We thus do not claim that this approach will necessarily yield an average treatment effect of the treated (ATT) and note that our method yields an approximate difference-in-difference estimator (aDID).  
+
+3. **Approximate Difference-in-Differences (aDID) (University of Wisconsin Population Health Institute (UWPHI))**: One potential shortcoming of the aDID approach is the choice of the comparison group. Improperly matched control groups can bias the results of classical DID models (Basu & Dylan, 2020) and would likely bias the results of aDID models as well. We identified alternatives to Douglas and Whatcom as control counties using the University of Wisconsin Population Health Institute (UWPHI) county health rankings tool to address this possibility (UWPHI, 2020). The health rankings tool uses various metrics to identify Washington counties closely resembling the DCLR counties in health and well-being measures. The UWPHI tool identified Adams, Clallam, Grays, and Mason counties as the closest match to the DCLR counties. We thus developed an additional BAU approach using comparing children in the DCLR condition with children entering shelter care in Lewis, Grant, Adams, Clallam, Grays Harbor, and Mason in the control period or Adams, Clallam, Grays Harbor, and Mason in the treatment period. 
+
+4. **Approximate Difference-in-Differences (aDID) with IPTW**: Simply choosing better counties for comparison helps the match issues identified above. However, this approach does nothing to address the bias that may result from mismatched children between the DCLR and BAU counties. For example, Grays Harbor and Grant counties may fare similarly on county-level health and well-being measures, but the children in shelter care within each county may look very different. To address this issue, we weighted our estimated models developed from the aDID-UWPHI approach using the inverse probability of treatment weighting (IPTW) technique proposed by Williamson, Forbes, and Ian (2013). 
+
+We find similar results across all four approaches to defining our BAU condition. In most analyses, the aDID-Legislative (Option 2) and aDID-UWPHI (Option 3) represent the average of all estimated treatment effects. Additionally, while helpful for sensitivity analyses, the propensity score model from which we derived weights for the aDID-IPTW approach is not stable. Specifically, we have a limited number of confounding variables available to specify the propensity model, and the weights are sensitive to the choice of confounding variables. Taking all of the BAU approaches into account, along with the legislative mandate to report on aDID-Legislative (Option 2), we limit the remaining discussion to this BAU approach. Results from the other BAU approaches are available from the authors on request. 
+
+#### Children Sampled for DCLR and BAU
+
+```{r treatment_vs_control_leg_setup, echo=FALSE}
+
+#1. Children who entered shelter care in Lewis and Grant during the treatment period, 
+
+group1 <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1, 
+    id_calendar_dim_shelter_care_begin >= params$treatment_start_date, 
+        age_at_shelter_care < 18
+
+  ) %>%
+  nrow()
+
+#2. Children who entered shelter care in Lewis and Grant during the control period, 
+
+group2 <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1, 
+    id_calendar_dim_shelter_care_begin < params$treatment_start_date, 
+        age_at_shelter_care < 18
+
+  ) %>%
+  nrow()
+
+#3. Children who entered shelter care in Douglas and Whatcom during the treatment period, and 
+
+group3 <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_leg_counties == 1, 
+    id_calendar_dim_shelter_care_begin >= params$treatment_start_date, 
+        age_at_shelter_care < 18
+
+  ) %>%
+  nrow()
+
+#4. Children who entered shelter care in Douglas and Whatcom during the control period. 
+
+group4 <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_leg_counties == 1, 
+    id_calendar_dim_shelter_care_begin < params$treatment_start_date, 
+        age_at_shelter_care < 18
+  ) %>%
+  nrow()
+
+treatment_vs_control_leg <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | 
+      fl_leg_counties == 1, 
+    
+    age_at_shelter_care < 18
+  ) %>%
+  # mutate(
+  #   patient_id = 1:nrow(.),
+  #   grp_id = ifelse(fl_minority == 1, 1, 2),
+  #   grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+  #   strategy_id = case_when(
+  #     id_calendar_dim_shelter_care_begin >= params$treatment_start_date & 
+  #       fl_treatment_counties == 1 ~ 2,
+  #     TRUE ~ 1
+  #   ),
+  #   age = age_at_shelter_care,
+  #   minority = fl_minority
+  # ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name, 
+    tx_braam_race, 
+    tx_gender, 
+    fl_treatment_period,
+    fl_treatment_counties
+  ) %>%
+  mutate(
+    Condition = as.factor(ifelse(strategy_id == 1, "BAU", "DCLR")),
+    `Braam Race` = tx_braam_race,
+    Gender = tx_gender,
+    `Age at Shelter Care` = age_at_shelter_care
+    )
+
+treatment_vs_control_leg_dismod <- run_model_and_sim(
+  treatment_vs_control_leg, 
+  tmat = tmat_episodes
+)
+
+#plot_sims(treatment_vs_control_leg)
+
+#plot_sims_by_age(treatment_vs_control_leg, n = 100000)
+```
+
+```{r treatment_vs_control_leg_los, eval=FALSE, fig.height=7, fig.width=9, include=FALSE}
+
+get_average_los(treatment_vs_control_leg, tmat = tmat_episodes) %>%
+  mutate(Condition = factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        Outcome = as.factor(case_when(
+          to == 2 ~ "Reunification", 
+          to == 3 ~ "Guardianship",
+          to == 4 ~ "Adoption"
+        )),
+        
+        `Time to Permanency` = time_to_permamency
+         ) %>%
+  ggplot(aes(x = Outcome, y = `Time to Permanency`, 
+             group = Condition, fill = Condition, 
+             colour = Condition)) +
+    geom_col(position = position_dodge(width = 1)) +
+    geom_text(aes(label=`Time to Permanency`), 
+              position = position_dodge(width = 0.9),vjust = -0.5
+                ) + 
+    labs(x="", y="Years to Permamency",
+       title="Expected Time to Permamency",
+       subtitle="Children in DCLR vs Business as Usual",
+       caption="Data taken from Superior Court Information Systems") + 
+  theme_ipsum(grid="Y") +
+  expand_limits(y = c(0,4)) +
+  scale_color_ipsum() +
+  scale_fill_ipsum() +
+    theme(legend.position="bottom") + 
+  theme(axis.text.y=element_blank())
+```
+
+We thus draw our baseline quantitative sample (using BAU approach two from above) from the following sources of shelter care events: 
+
+1. Children who entered shelter care in Lewis and Grant during the treatment period (*n=*`r group1`),  
+
+2. Children who entered shelter care in Lewis and Grant during the control period (*n=*`r group2`), 
+
+3. Children who entered shelter care in Douglas and Whatcom during the treatment period (*n=*`r group3`), and 
+
+4. Children who entered shelter care in Douglas and Whatcom during the control period (*n=*`r group4`). 
+
+This sampling approach will allow us to compare outcomes in the DCLR pilot with outcomes in the same jurisdictions before the pilot while simultaneously comparing the DCLR pilot with Douglas and Whatcom counties over the same period. In total, a sample of `r group1 + group2 + group3 + group4` children were included in our baseline quantitative sample. 
+
+## Data Sources and Variables
+
+Data obtained from focus groups…
+
+Data describing children’s juvenile court and child welfare experiences come from two primary sources: (1) the Department of Children Youth and Families (DCYF) Transitional  Comprehensive Child Welfare Information System (CCWIS) and (2) the Administrative Office of the Courts (AOC) Superior Court Information System. AOC links these data quarterly through an ongoing data-sharing agreement with DCYF. 
+The integrated data set contains children’s demographic information and histories of out-of-home placements. Specific data elements within the DCYF data include race, ethnicity, date of birth, and removal date. Specific data elements within the AOC data include changes in legal status (e.g., continued shelter care, adjudication of dependency, dispositions) and dates of all legal actions (e.g., petition filings, review hearings, permanency planning hearings).  
+
+## Analytic Approach
+
+### Participant Interviews
+
+### Permanency Outcome Analysis
+
+Analysis of child outcomes in dependency courts must account for the various legal milestones in a dependency case. For example, a child reunified with their parents may experience a disposition of their case (through adjudication of the dependency petition), or the court may simply exit the child from the system because the child does not meet the legal requirements for shelter care. Understanding how children transition through these various milestones is critical to understanding the impact of DCLR. To examine these transitions, we estimate a simplified multi-state transition model exploring only the states outlined in purple in Figure 2. We initially estimate two models - a Cox proportional hazards model and a Gompertz proportional hazards model. We estimate the Cox model as the typical choice for examining variance in the rate of permanency outcomes across groups of children in foster care (cite). We separately estimate a fully parametric Gompertz model that will allow us to easily make the predictions necessary to perform the cost analysis, a required evaluation component. For the Cox model, we utilize the survival package in R for estimation. This model included a clustered sandwich estimator to avoid bias due to autocorrelation among sibling groups (cite). We also parametrized the Cox model to allow the baseline hazard to vary by strata defined by time and jurisdiction (cite). Parameter estimates from the Gompertz model provided similar conclusions to the results of the Cox model. For the sake of simplicity, since we require the Gompertz model for the cost analysis below, we report only the Gompertz model in this report. Results from the Cox model are available from the authors on request. 
+
+### Placement Mobility Analysis
+
+### Juvenile Justice Analysis
+
+### Educational Analysis
+
+### Cost Analysis
+
+# Results
+
+We present the results from the evaluation in six sections. The first section discusses the results of our focus group analyses and the analysis of the attorney check-lists. The second section presents the descriptive characteristics of the baseline sample of children used in the quantitative analyses. The third section presents the permanency outcome analysis. The fourth section focuses on placement mobility. The fifth section focuses on juvenile justice outcomes. Finally, the sixth section describes the cost analysis. 
+
+## Sample Descriptive Statistics 
+
+We list the characteristics of the sample in Table 1. The median age at shelter care is 3.8 years. Just over half of the sample is female (*n=* 727). The two largest racial categories (classified according to the Braam standard) are White (51%) and Hispanic (22%). We see no statistically significant differences between the BAU and DCLR groups except for race. Most notably, 21% of the BAU sample is identified as Native American (compared with 11% in the DCLR sample) and 18% of the DCLR sample is identified as Hispanic (compared with 30% of the DCLR sample). In subsequent statistical analyses which do not vary meaningfully from the results presented here, we attempt to address this imbalance in the samples using the aDID-IPTW approach (i.e., propensity score weighting) described above. Again, the results of these additional analyses are available from the authors on request. 
+
+```{r, results='asis', echo=FALSE}
+
+fisher.test.simulate.p.values <- function(data, variable, by, ...) {
+  result <- list()
+  test_results <- stats::fisher.test(data[[variable]], data[[by]], simulate.p.value = TRUE)
+  result$p <- test_results$p.value
+  result$test <- test_results$method
+  result
+}
+
+treatment_vs_control_leg %>%
+  select(Condition, `Age at Shelter Care`, `Braam Race`, Gender) %>%
+  tbl_summary(
+    by = Condition,
+    # type = all_continuous() ~ "continuous2",
+    # statistic = all_continuous() ~ c("{N_nonmiss}",
+    #                                  "{mean} ({sd})"),
+    missing = "no"
+  ) %>%
+  italicize_levels() %>% 
+  add_p(  test = list(all_categorical() ~ "fisher.test.simulate.p.values"), 
+          pvalue_fun = ~style_pvalue(.x, digits = 2, prepend_p = TRUE)# this applies the custom test to all categorical variables                     pvalue_fun = ~style_pvalue(.x, digits = 2, prepend_p = TRUE),
+) %>% # test for a difference between groups
+    add_overall() %>%
+    modify_spanning_header(c("stat_1", "stat_2") ~ "**Representation Condition**") %>%
+  modify_header(update = list(label ~ "**Variable**", p.value ~ "**Sig**")) %>% # update the column header
+  modify_footnote(p.value ~ "p-value associated with Wilcoxon rank sum test (for Age); Fisher's Exact Test with simulated p-value (for Race); or Fisher's Exact Test (for Gender)") %>% 
+      modify_caption("Table 1: Child Characteristics") %>%
+  bold_labels() %>%
+  as_flex_table()
+
+```  
+
+
+```{r echo=FALSE, out.width='8cm', fig.cap="Figure 1: Dependency Transition States"}
+
+linguisticsdown::include_graphics2('https://lucid.app/publicSegments/view/17fa540d-c15d-4909-8b36-ad08d4feb126/image.png')
+```
+
+## Permanency Outcome Modeling
+
+The estimated hazard ratios of exit to reunification, guardianship, or adoption for children represented are presented in the table below.
+
+```{r echo=FALSE}
+treatment_vs_control_leg <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | 
+      fl_leg_counties == 1, 
+    
+    age_at_shelter_care < 18
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & 
+        fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name, 
+    tx_braam_race, 
+    tx_gender,
+    fl_treatment_period, 
+    fl_treatment_counties
+  ) %>%
+  mutate(
+    Condition = as.factor(ifelse(strategy_id == 1, "BAU", "DCLR")),
+    `Braam Race` = tx_braam_race,
+    Gender = tx_gender,
+    `Age at Shelter Care` = age_at_shelter_care
+    )
+  
+dat_ms <- msprep(
+  data = as.data.frame(treatment_vs_control_leg),
+  trans = tmat_episodes,
+  time = episode_trans_times,
+  status = episode_trans_states,
+  keep = covs) %>%
+  as.data.frame() %>%
+  mutate(
+    Tstop = Tstop + 1,
+    time = time + 1,
+  )
+
+  dat_ms$years <- dat_ms$time/365.25
+
+model_formula <- Surv(years, status) ~ age + 
+        minority + 
+        fl_treatment_period + 
+        fl_treatment_counties + 
+        factor(strategy_id)
+        #fl_treatment_counties:age +
+        #fl_treatment_period:age +   
+        #factor(strategy_id):age
+
+
+fits_gomp1 <- flexsurvreg(
+      model_formula,
+      data = dat_ms %>% filter(trans == 1),
+      dist = "gompertz")
+
+fits_gomp2 <- flexsurvreg(
+      model_formula,
+      data = dat_ms %>% filter(trans == 2),
+      dist = "gompertz")
+
+
+fits_gomp3 <- flexsurvreg(
+      model_formula,
+      data = dat_ms %>% filter(trans == 3),
+      dist = "gompertz")
+
+numformat <- function(val) { sub("^(-?)0.", "\\1.", sprintf("%.2f", val)) }
+
+# flex_tidy <- function(x, exponentiate = FALSE, conf.level = 0.95, ...) {
+#   tidy <-
+#     dplyr::bind_cols(
+#       broom::tidy(x, conf.int = FALSE),
+#       # calculate the confidence intervals, and save them in a tibble
+#       stats::confint.default(x) %>%
+#         tibble::as_tibble() %>%
+#         rlang::set_names(c("conf.low", "conf.high"))
+#     )
+#   
+#   if (exponentiate == TRUE) {
+#     tidy <- dplyr::mutate(tidy,
+#       estimate = round(exp(estimate), 2),
+#       std.error = round(estimate*std.error, 2),
+#       estimate = paste0(estimate, " (", numformat(std.error), ")"),
+#       conf.low = exp(conf.low),
+#       conf.high = exp(conf.high)
+#     )
+#   } else {
+#     tidy <- tidy
+#   }
+#   tidy
+# }
+# 
+# 
+# flex_tidy(fits_gomp1, exponentiate = TRUE)
+
+param_vars <- c("shape", "rate")
+beta_var_relabel <- list(`factor(strategy_id)2` ~ "DCLR County X DCLR Period", 
+                            age ~ "Age at Shelter Care",
+                         fl_treatment_period ~ "DCLR Period",
+                         fl_treatment_counties ~ "DCLR County",
+                            minority ~ "Minority Child"
+                         #   `age:factor(strategy_id)2` ~ "DCLR County X DCLR Period X Age"
+                         )
+
+
+m1 <- tbl_regression(fits_gomp1, 
+                     pvalue_fun = ~style_pvalue(.x, digits = 2, prepend_p = TRUE),
+              # estimate_fun = ~ round(exp(.x), 2), 
+               label = beta_var_relabel,
+               include = -dplyr::any_of(param_vars)) %>% 
+    modify_header(update = list(label ~ "**Variable**", p.value ~ "**Sig.**", 
+                                estimate ~ "**HR**")) %>% 
+  modify_footnote(list(estimate ~ "HR = Hazard Ratio", 
+                  p.value ~ "p-value associated a two-sided t-test of the HR")) %>%
+    modify_table_header(column = "ci",
+                      hide = TRUE)
+m2 <- tbl_regression(fits_gomp2, 
+                     pvalue_fun = ~style_pvalue(.x, digits = 2, prepend_p = TRUE),
+              # estimate_fun = ~ round(exp(.x), 2), 
+               label = beta_var_relabel,
+               include = -dplyr::any_of(param_vars)) %>% 
+    modify_header(update = list(label ~ "**Variable**", p.value ~ "**Sig.**", 
+                                estimate ~ "**HR**")) %>% 
+  modify_footnote(list(estimate ~ "HR = Hazard Ratio", 
+                  p.value ~ "p-value associated a two-sided t-test of the HR")) %>%
+    modify_table_header(column = "ci",
+                      hide = TRUE)
+
+enquo_term <- sym(names(list(name = m2$table_body$term)))
+# 
+# get_exp_se <- function(model, term) {
+#   svycontrast(model, quote(exp(term)))
+# }
+# 
+# get_exp_se(fits_gomp1, "age")
+# 
+# svycontrast_df <- function(fit, newdata) {
+#   # Call surveyconstrast with a data frame 
+#   df <- newdata
+#   
+#   # Transform data.frame into a list of its row vectors
+#   df_list <- as.list(as.data.frame(t(newdata))) 
+#   df_list <- lapply(df_list, setNames, colnames(df)) # Set all character vector names inside list
+#   
+#   # Return a named list
+#   setNames(as.list(as.data.frame(svycontrast(fit, df_list))), c("est", "se"))
+# }
+# 
+# newdata <- names(fits_gomp1$coefficients)
+# 
+# svycontrast(fits_gomp1, rlist::list.names(as.list(names(fits_gomp1$coefficients))))
+# 
+# 
+# 
+# svycontrast_df(fits_gomp1)
+# 
+# m2$table_body <- mutate(m2$table_body,
+#                         std.error = exp(estimate)*std.error,
+#                         estimate_se = paste0(exp(estimate), " (", , "var")), ")")
+#                       )
+# #       std.error = round(estimate*std.error, 2),
+# #       estimate = paste0(estimate, " (", numformat(std.error), ")"),
+m3 <- tbl_regression(fits_gomp3, 
+                     pvalue_fun = ~style_pvalue(.x, digits = 2, prepend_p = TRUE),
+               estimate_fun = ~ round(exp(.x), 2), 
+               label = beta_var_relabel,
+               include = -dplyr::any_of(param_vars)) %>% 
+    modify_header(update = list(label ~ "**Variable**", p.value ~ "**Sig.**", 
+                                estimate ~ "**HR**")) %>% 
+  modify_footnote(list(estimate ~ "HR = Hazard Ratio", 
+                  p.value ~ "p-value associated a two-sided t-test of the HR")) %>%
+    modify_table_header(column = "ci",
+                      hide = TRUE)
+
+
+# merge tables 
+  tbl_merge(
+    tbls = list(m1, m2, m3),
+    tab_spanner = c("**Reunification**", "**Guardianship**", "**Adoption**")
+  ) %>% modify_caption("Table 2: Permanency Outcomes") %>%
+  bold_labels() %>%
+  as_flex_table() 
+  #%>%
+  #  width(width = .65, j = 2:10)
+```
+
+

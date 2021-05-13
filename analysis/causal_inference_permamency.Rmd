@@ -1,0 +1,595 @@
+---
+title: "Causal Inference"
+output: workflowr::wflow_html
+params:
+  control_censor_date: 20180228
+  control_start_date: 20150901
+  control_stop_date: 20170831
+  treatment_censor_date: 20200229
+  treatment_start_date: 20170901
+  treatment_stop_date: 20190831
+---
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dagitty)
+library(ggdag)
+library(twang)
+library(ggplot2)
+library(ggpubr)
+library(survival)
+library(mstate)
+library(flexsurv)
+library(hesim)
+
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	#cache = TRUE, 
+	autodep = TRUE
+)
+dotenv::load_dot_env(
+  paste0(
+    rprojroot::find_rstudio_root_file(),
+    "/.env"
+    )
+)
+
+con <- odbc::dbConnect(
+  odbc::odbc(),
+  Driver = "ODBC Driver 17 for SQL Server",
+  Server = Sys.getenv("MSSQL_SERVER"),
+  Database = Sys.getenv("MSSQL_DB"),
+  UID = Sys.getenv("MSSQL_UN"),
+  PWD = Sys.getenv("MSSQL_PW"),
+  Port = Sys.getenv("MSSQL_PORT")
+)
+```
+
+```{sql, connection=con, output.var="dcyf_data_end_tbl", include=FALSE}
+select max(id_calendar_dim_begin) from base.rptPlacement;
+```
+
+```{r assign_dcyf_date, class.source="r", include=FALSE}
+dcyf_data_end <- as.integer(dcyf_data_end_tbl[1,1])
+```
+
+# Treatment vs Treatment
+
+```{r treatment_vs_treatment}
+
+
+shelter_care_events_timed_filtered <- feather::read_feather("data/shelter_care_events_timed_filtered.feather")
+
+covs <- c("age", "minority", "strategy_id")
+
+episode_trans_times <- c(NA, "days_to_reunification", "days_to_guardianship", "days_to_adoption")
+
+episode_trans_states <- c(NA, "fl_reunification", "fl_guardianship", "fl_adoption") 
+
+treatment_vs_treatment <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = ifelse(id_calendar_dim_shelter_care_begin >= params$treatment_start_date, 2, 1),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   
+
+run_model_and_sim <- function(dat, iptw=FALSE, n = 1000){
+  tmat_episodes <- transMat(x = list(c(2, 3, 4), c(), c(), c()), 
+                          names = c("Sc", "Re", "Gd", "Ad"))
+  
+  dat_ms <- msprep(
+    data = as.data.frame(dat),
+    trans = tmat_episodes,
+    time = episode_trans_times,
+    status = episode_trans_states,
+    keep = covs) %>%
+    as.data.frame() %>%
+    mutate(
+      Tstop = Tstop + 1,
+      time = time + 1,
+    )
+  
+  n_trans <- max(tmat_episodes, na.rm = TRUE)
+  fits_gomp <- vector(mode = "list", length = n_trans)
+  dat_ms$years <- dat_ms$time/365.25
+  for (i in 1:n_trans){
+    
+    if (iptw) {
+      weights <- dat_ms %>% filter(trans == i) %>% .$IPTW
+    } else {
+      weights <- NULL
+    }
+    
+    fits_gomp[[i]] <- flexsurvreg(Surv(years, status) ~ factor(strategy_id) + 
+                                                     age + 
+                                                     minority + 
+                                                     factor(strategy_id):age ,
+                                  weights = weights,
+                         data = dat_ms %>% filter(trans == i),
+                         dist = "gompertz")
+  }
+
+
+  strategies <- data.frame(strategy_id = c(1, 2))
+  patients <- data.frame(patient_id = seq(1:(18*2)), age = rep(0:17, 2),
+                         grp_id = rep(0:17, 2),
+                            minority = c(rep(0, 18), rep(1, 18)))
+  states <- data.frame(state_id =  seq(1, 4))
+  colnames(tmat_episodes) <- rownames(tmat_episodes) <- c("Shelter Care", "Reunification", "Guardianship", "Adoption")
+  
+  transitions <- create_trans_dt(tmat_episodes) %>%
+    mutate(trans = factor(transition_id))
+  
+  hesim_dat <- hesim_data(strategies = strategies,
+                          patients = patients,
+                          states = states, 
+                          transitions = transitions)
+  
+  transmod_data <- expand(hesim_dat, 
+                          by = c("strategies", "patients", "transitions"))
+  
+  dismod <- create_IndivCtstmTrans(object = hesim::flexsurvreg_list(fits_gomp), 
+                                   input_data = transmod_data,
+                                   trans_mat = tmat_episodes,
+                                   clock = "forward",
+                                   point_estimate = FALSE,
+                                   n = n) 
+  
+  return(dismod)
+}
+
+treatment_vs_treatment_dismod <- run_model_and_sim(treatment_vs_treatment)
+
+get_total_costs <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+
+  ictstm$sim_disease()
+  
+  represented_care_day <- 50
+  
+  care_day <- 45.57
+  
+  adoption_day <-22.4
+  
+  pr_guardianship_subsidy <- .05
+  
+  childhood_cost_summary <- ictstm$disprog_ %>%
+    as_data_frame() %>%
+    mutate(
+      age_at_exit = grp_id + time_stop,
+      years_of_permanency =  ifelse(18-age_at_exit < 0, 
+                                    0, 18-age_at_exit),
+      years_of_care = time_stop,
+      years_of_permanency_adoption = ifelse(to == 4, years_of_permanency, 0),
+      years_of_permanency_guardianship = ifelse(to == 3, years_of_permanency, 0),
+      years_of_permanency_reunification = ifelse(to == 2, years_of_permanency, 0)
+    ) %>%
+    group_by(
+      strategy_id
+    ) %>%
+    summarise(
+      years_of_care = sum(years_of_care),
+      years_of_adoption = sum(years_of_permanency_adoption),
+      years_of_guardianship = sum(years_of_permanency_guardianship),
+      years_of_reunification = sum(years_of_permanency_reunification)
+    ) %>%
+    mutate(
+      cost_of_care = case_when(
+        strategy_id == 1 ~ years_of_care*care_day,
+        strategy_id == 2 ~ years_of_care*represented_care_day
+      ),
+      cost_adoption = years_of_adoption*adoption_day,
+      cost_of_guardianship = years_of_guardianship*pr_guardianship_subsidy,
+      cost_of_reunification = 0,
+      total_cost = cost_of_care + cost_adoption + cost_of_guardianship + cost_of_reunification
+    )
+  
+  return(childhood_cost_summary)
+
+}
+
+nearest_10 <- scales::dollar_format(scale=1)
+
+cost_dat <- get_total_costs(treatment_vs_treatment) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        `Childhood Costs` = nearest_10(total_cost)
+         )
+
+  ggbarplot(cost_dat, "Condition", "total_cost",
+  fill = "Condition", color = "Condition", palette = "Paired",label = cost_dat$`Childhood Costs`,
+  position = position_dodge(0.9)) + 
+      scale_y_continuous(labels=scales::dollar_format()) + 
+    ylab("Total Childhood Costs") + xlab("")
+
+plot_sims <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  p <- dismod$sim_stateprobs(t = seq(0, 3, by = .1)) %>%
+  as_tibble() %>%
+  group_by(strategy_id, state_id, t) %>%
+  summarise(
+    prob = mean(prob)*18
+  ) %>%
+  filter(state_id != 1) %>% 
+  mutate(
+    strategy_id = ifelse(strategy_id == 1, "Business as Usual", "Universal Representation"),
+    state_id = case_when(
+      state_id == 2 ~ "Reunification", 
+      state_id == 3 ~ "Guardianship",
+      state_id == 4 ~ "Adoption"
+    )
+  ) %>%
+  ggplot(data = ., 
+         aes(x = t, y = prob, group = as.factor(state_id), colour = as.factor(state_id))) + 
+  geom_line() + 
+  facet_wrap(~ strategy_id) + 
+  theme_minimal() + 
+  ylab("Percentage In of Outcome") + 
+  xlab("Years Since Shelter Care") + 
+  scale_y_continuous(labels = scales::percent) + 
+    labs(colour = "Outcomes")
+
+
+ggpubr::ggpar(p,palette="nejm")
+
+}
+
+plot_sims(treatment_vs_treatment)
+
+plot_sims_by_age <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+  
+  ictstm$sim_disease()
+  
+  ictstm$disprog_ %>%
+    as_data_frame() %>%
+    group_by(strategy_id, to, grp_id) %>%
+    summarise(
+      time_to_permamency = mean(time_stop)
+    ) %>%
+  mutate(
+    strategy_id = ifelse(strategy_id == 1, "Business as Usual", "Universal Representation"),
+    to = case_when(
+      to == 2 ~ "Reunification", 
+      to == 3 ~ "Guardianship",
+      to == 4 ~ "Adoption"
+    )
+  ) %>%    
+    ggplot(data = ., 
+       aes(x = grp_id, y = time_to_permamency, group = as.factor(to), colour = as.factor(to))) + 
+        geom_line() + 
+        facet_wrap(~ strategy_id) + 
+      theme_minimal() + 
+  ylab("Years to Permamency") + 
+  xlab("Age at Shelter Care (Years)") + 
+    labs(colour = "Outcomes")
+}
+
+plot_sims_by_age(treatment_vs_treatment, n = 100000)
+
+get_average_los <- function(dat, n = 1000){
+  
+  dismod <- run_model_and_sim(dat, n = n)
+  
+  ictstm <- IndivCtstm$new(trans_model = dismod)
+  
+  ictstm$sim_disease()
+
+  ictstm$disprog_ %>%
+    as_data_frame() %>%
+    group_by(strategy_id, to) %>%
+    summarise(
+      time_to_permamency = round(mean(time_stop), 2)
+    )
+}
+
+get_average_los(treatment_vs_treatment) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        Outcome = as.factor(case_when(
+          to == 2 ~ "Reunification", 
+          to == 3 ~ "Guardianship",
+          to == 4 ~ "Adoption"
+        )),
+        
+        `Time to Permanency` = time_to_permamency
+         ) %>%
+  ggbarplot(., "Outcome", "Time to Permanency",
+  fill = "Condition", color = "Condition", palette = "Paired",
+  label = TRUE,
+  position = position_dodge(0.9))
+```
+
+# Treatment vs Control Leg
+
+```{r treatment_vs_control_leg}
+treatment_vs_control_leg <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | fl_leg_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   
+
+treatment_vs_control_leg_dismod <- run_model_and_sim(treatment_vs_control_leg)
+
+cost_dat <- get_total_costs(treatment_vs_control_leg) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        `Childhood Costs` = nearest_10(total_cost)
+         )
+
+  ggbarplot(cost_dat, "Condition", "total_cost",
+  fill = "Condition", color = "Condition", palette = "Paired",label = cost_dat$`Childhood Costs`,
+  position = position_dodge(0.9)) + 
+      scale_y_continuous(labels=scales::dollar_format()) + 
+    ylab("Total Childhood Costs") + xlab("")
+
+plot_sims(treatment_vs_control_leg)
+
+plot_sims_by_age(treatment_vs_control_leg, n = 100000)
+
+get_average_los(treatment_vs_control_leg) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        Outcome = as.factor(case_when(
+          to == 2 ~ "Reunification", 
+          to == 3 ~ "Guardianship",
+          to == 4 ~ "Adoption"
+        )),
+        
+        `Time to Permanency` = time_to_permamency
+         ) %>%
+  ggbarplot(., "Outcome", "Time to Permanency",
+  fill = "Condition", color = "Condition", palette = "Paired",
+  label = TRUE,
+  position = position_dodge(0.9))
+
+```
+
+# Treatment vs Control RWJ
+
+```{r treatment_vs_control_rwj}
+treatment_vs_control_similar <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | fl_similar_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name
+  )   
+
+treatment_vs_control_similar_dismod <- run_model_and_sim(treatment_vs_control_similar)
+
+cost_dat <- get_total_costs(treatment_vs_control_similar) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        `Childhood Costs` = nearest_10(total_cost)
+         )
+
+  ggbarplot(cost_dat, "Condition", "total_cost",
+  fill = "Condition", color = "Condition", palette = "Paired",label = cost_dat$`Childhood Costs`,
+  position = position_dodge(0.9)) + 
+      scale_y_continuous(labels=scales::dollar_format()) + 
+    ylab("Total Childhood Costs") + xlab("")
+
+plot_sims(treatment_vs_control_similar)
+
+plot_sims_by_age(treatment_vs_control_similar, n = 100000)
+
+get_average_los(treatment_vs_control_similar) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        Outcome = as.factor(case_when(
+          to == 2 ~ "Reunification", 
+          to == 3 ~ "Guardianship",
+          to == 4 ~ "Adoption"
+        )),
+        
+        `Time to Permanency` = time_to_permamency
+         ) %>%
+  ggbarplot(., "Outcome", "Time to Permanency",
+  fill = "Condition", color = "Condition", palette = "Paired",
+  label = TRUE,
+  position = position_dodge(0.9))
+
+```
+
+# Treatment vs Control Propensity
+
+
+```{r propensity_model_setup}
+
+propensity_dat <- feather::read_feather("data/propensity_dat.feather")
+
+
+
+propensity_dat_full <- shelter_care_events_timed_filtered %>% 
+
+left_join(
+  propensity_dat,
+    #dplyr::select(id_removal_episode_fact),
+  by = c("id_person" = "id_person_child")
+  #by = "id_case_dependency"
+) %>% 
+  filter(
+    fl_treatment_counties == 1 | fl_similar_counties == 1
+    #id_calendar_dim_shelter_care_begin >= params$treatment_start_date
+  ) %>%
+  distinct() %>%
+  mutate(
+      strategy_id = case_when(
+      fl_treatment_counties == 1 ~ 1,
+      TRUE ~ 0
+    )
+  )
+
+# 
+# gbm_ps <- function(dataset, psFormula){
+#   # es: refers to standardized effect size.
+#   myGBM <- ps(psFormula, data = dataset, n.trees=10000, interaction.depth=5,
+#               shrinkage=0.001, stop.method=c("es.max"), estimand = "ATT",
+#               verbose=TRUE)
+# 
+#   #extract estimated propensity scores from object
+#   gbm_estimations <- myGBM$ps[, 1]
+#   return(gbm_estimations)
+# }
+
+
+# prop_model_XG_ARSY <-gbm_ps(dataset = as.data.frame(propensity_dat_full),
+#                       psFormula = strategy_id~children_on_referral+fl_native+fl_black+fl_asian+fl_hispanic+
+#  fl_unknown+year_of_removal)
+# 
+# saveRDS(object = prop_model_XG_ARSY, file = "/Users/mienko/legal-representation-evaluation/data/prop_model_XG_ARSY.rds")
+
+prop_model_XG_ARSY <- readRDS(file = "/Users/mienko/legal-representation-evaluation/data/prop_model_XG_ARSY.rds")
+
+propensity_dat_full$pr_score <- prop_model_XG_ARSY
+
+#trim extreme values for stability
+propensity_dat_full$pr_score_trim <-if_else(propensity_dat_full$pr_score<.01,.01,propensity_dat_full$pr_score)
+
+propensity_dat_full$IPTW <-propensity_dat_full$strategy_id/propensity_dat_full$pr_score_trim + (1-propensity_dat_full$strategy_id)/(1-propensity_dat_full$pr_score_trim)
+
+# ## Matched
+# # 
+# matched <- propensity_dat_full %>%
+#   dplyr::select(children_on_referral,
+#          fl_native, strategy_id, id_case_dependency,
+#          fl_black,fl_asian,fl_hispanic,child_eps_rank,
+#          fl_unknown,caretaker_age_at_removal,year_of_removal) %>%
+#   drop_na() %>%
+#   matchit(strategy_id~children_on_referral+fl_native+fl_black+fl_asian+fl_hispanic+child_eps_rank+
+#   fl_unknown+caretaker_age_at_removal+year_of_removal,data = ., method = "optimal", verbose = TRUE)
+# 
+# matched_sum<-summary(matched)
+# matched_sum$nn
+# 
+# matched_data <- match.data(matched)
+
+
+
+```
+
+
+# Treatment vs IPTW
+
+```{r treatment_vs_control_iptw}
+treatment_vs_control_similar_iptw <- shelter_care_events_timed_filtered %>%
+  filter(
+    fl_treatment_counties == 1 | fl_similar_counties == 1
+  ) %>%
+  mutate(
+    patient_id = 1:nrow(.),
+    grp_id = ifelse(fl_minority == 1, 1, 2),
+    grp_name = ifelse(fl_minority == 1, "Minority", "Non-Minority"),
+    strategy_id = case_when(
+      id_calendar_dim_shelter_care_begin >= params$treatment_start_date & fl_treatment_counties == 1 ~ 2,
+      TRUE ~ 1
+    ),
+    age = age_at_shelter_care,
+    minority = fl_minority
+  ) %>%
+  dplyr::select(
+    starts_with(covs),
+    starts_with(episode_trans_times),
+    starts_with(episode_trans_states),
+    patient_id,
+    grp_id,
+    grp_name,
+    id_case_dependency
+  ) %>%
+  inner_join(
+    propensity_dat_full %>%
+      dplyr::select(
+        IPTW, id_case_dependency
+      ),
+    by = "id_case_dependency"
+  )
+
+treatment_vs_control_similar_iptw_dismod <- run_model_and_sim(treatment_vs_control_similar_iptw, iptw = TRUE)
+
+cost_dat <- get_total_costs(treatment_vs_control_similar_iptw) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        `Childhood Costs` = nearest_10(total_cost)
+         )
+
+  ggbarplot(cost_dat, "Condition", "total_cost",
+  fill = "Condition", color = "Condition", palette = "Paired",label = cost_dat$`Childhood Costs`,
+  position = position_dodge(0.9)) + 
+      scale_y_continuous(labels=scales::dollar_format()) + 
+    ylab("Total Childhood Costs") + xlab("")
+
+plot_sims(treatment_vs_control_similar_iptw)
+
+plot_sims_by_age(treatment_vs_control_similar_iptw, n = 100000)
+
+get_average_los(treatment_vs_control_similar_iptw) %>%
+  mutate(Condition = as.factor(ifelse(strategy_id == 1, "Business as Usual", "Universal Representation")),
+        Outcome = as.factor(case_when(
+          to == 2 ~ "Reunification", 
+          to == 3 ~ "Guardianship",
+          to == 4 ~ "Adoption"
+        )),
+        
+        `Time to Permanency` = time_to_permamency
+         ) %>%
+  ggbarplot(., "Outcome", "Time to Permanency",
+  fill = "Condition", color = "Condition", palette = "Paired",
+  label = TRUE,
+  position = position_dodge(0.9))
+
+
+```
