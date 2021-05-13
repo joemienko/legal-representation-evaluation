@@ -106,11 +106,11 @@ adjustmentSets(dag, "L", "P",  effect="total", type="all")
 ```{r read_files}
 
 shelter_care_events_timed <- feather::read_feather(
-  "~/legal-representation-evaluation/data/shelter_care_events_timed.feather"
+  "~/legal-representation-evaluation/data/shelter_care_events.feather"
 )
 
 shelter_care_events_timed_control <- feather::read_feather(
-  "~/legal-representation-evaluation/data/shelter_care_events_timed_control.feather"
+  "~/legal-representation-evaluation/data/shelter_care_events_control.feather"
 )
 ```
 
