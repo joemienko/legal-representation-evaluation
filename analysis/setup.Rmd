@@ -13,6 +13,19 @@ setup instructions.
 
 ## Setup instructions
 
-Download or clone the
-[git repository](https://github.com/stephenslab/wflow-divvy)
-on your computer.
+1. Download or clone the [git repository](https://github.com/cssat/legal-representation-evaluation) on your computer.
+
+2. Prepare a `.env` file in the following format
+
+```
+MSSQL_PW=<add SQL SERVER PASSWORD HERE>
+MSSQL_UN=<add SQL SERVER USER NAME HERE>
+MSSQL_SERVER=<add SQL SERVER IP ADDRESS HERE>
+MSSQL_DB='CA_ODS'
+MSSQL_PORT='1433'
+CENSUS_API_KEY=<add CENSUS API KEY HERE>
+```
+
+NOTE: Census API Keys can be obtained for free from [here](https://api.census.gov/data/key_signup.html). 
+
+

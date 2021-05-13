@@ -384,10 +384,10 @@ div.section {
 <div class="tab-content">
 <div id="summary" class="tab-pane fade in active">
 <p>
-<strong>Last updated:</strong> 2021-02-22
+<strong>Last updated:</strong> 2021-05-13
 </p>
 <p>
-<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 5 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 2
+<strong>Checks:</strong> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> 6 <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> 1
 </p>
 <p>
 <strong>Knit directory:</strong> <code>legal-representation-evaluation/</code> <span class="glyphicon glyphicon-question-sign" aria-hidden="true" title="This is the local directory in which the code in this file was executed."> </span>
@@ -403,12 +403,12 @@ This reproducible <a href="http://rmarkdown.rstudio.com">R Markdown</a> analysis
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguncommittedchanges"> <span class="glyphicon glyphicon-exclamation-sign text-danger" aria-hidden="true"></span> <strong>R Markdown file:</strong> uncommitted changes </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRMarkdownfilestronguptodate"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>R Markdown file:</strong> up-to-date </a>
 </p>
 </div>
-<div id="strongRMarkdownfilestronguncommittedchanges" class="panel-collapse collapse">
+<div id="strongRMarkdownfilestronguptodate" class="panel-collapse collapse">
 <div class="panel-body">
-<p>The R Markdown is untracked by Git. To know which version of the R Markdown file created these results, you’ll want to first commit it to the Git repo. If you’re still working on the analysis, you can ignore this warning. When you’re finished, you can run <code>wflow_publish</code> to commit the R Markdown file and build the HTML.</p>
+<p>Great! Since the R Markdown file has been committed to the Git repository, you know the exact version of the code that produced these results.</p>
 </div>
 </div>
 </div>
@@ -499,16 +499,16 @@ unnamed-chunk-4
 <div class="panel panel-default">
 <div class="panel-heading">
 <p class="panel-title">
-<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong6c1d2a4"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 6c1d2a4 </a>
+<a data-toggle="collapse" data-parent="#workflowr-checks" href="#strongRepositoryversionstrong1832f40"> <span class="glyphicon glyphicon-ok text-success" aria-hidden="true"></span> <strong>Repository version:</strong> 1832f40 </a>
 </p>
 </div>
-<div id="strongRepositoryversionstrong6c1d2a4" class="panel-collapse collapse">
+<div id="strongRepositoryversionstrong1832f40" class="panel-collapse collapse">
 <div class="panel-body">
 <p>
 Great! You are using Git for version control. Tracking code development and connecting the code version to the results is critical for reproducibility.
 </p>
 <p>
-The results in this page were generated with repository version 6c1d2a4. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
+The results in this page were generated with repository version 1832f40. See the <em>Past versions</em> tab to see a history of the changes made to the R Markdown and HTML files.
 </p>
 <p>
 Note that you need to be careful to ensure that all relevant files for the analysis have been committed to Git prior to generating the results (you can use <code>wflow_publish</code> or <code>wflow_git_commit</code>). workflowr only checks the R Markdown file, but you know if there are other scripts or data files that it depends on. Below is the status of the Git repository when the results were generated:
@@ -522,56 +522,50 @@ Ignored files:
     Ignored:    analysis/.DS_Store
     Ignored:    analysis/data_import_cache/
     Ignored:    analysis/data_wrangling_cache/
+    Ignored:    analysis/prop_model_XG.rds
     Ignored:    analysis/shelter_care_population_cache/
     Ignored:    analysis/shelter_care_population_control_cache/
     Ignored:    code/.DS_Store
     Ignored:    code/SQL/
-
-Untracked files:
-    Untracked:  .nojekyll
-    Untracked:  analysis/.nojekyll
-    Untracked:  analysis/causal_inference.Rmd
-    Untracked:  analysis/data_import.Rmd
-    Untracked:  analysis/data_wrangling.Rmd
-    Untracked:  analysis/first-glance.Rmd
-    Untracked:  analysis/include/
-    Untracked:  analysis/prop_model_XG.rds
-    Untracked:  analysis/seasonal-trends.Rmd
-    Untracked:  analysis/setup.Rmd
-    Untracked:  analysis/shelter_care_population.Rmd
-    Untracked:  analysis/shelter_care_population_control.Rmd
-    Untracked:  analysis/station-map.Rmd
-    Untracked:  analysis/time-of-day-trends.Rmd
-    Untracked:  code/R/
-    Untracked:  code/SPSS/
-    Untracked:  data/aoc/
-    Untracked:  data/case_jurisdiction.feather
-    Untracked:  data/child_birthday_18.feather
-    Untracked:  data/child_dependency_episode.feather
-    Untracked:  data/child_episode.feather
-    Untracked:  data/dependency_end_events.feather
-    Untracked:  data/dependency_start_events.feather
-    Untracked:  data/filing_events.feather
-    Untracked:  data/ospi/
-    Untracked:  data/person_ids.feather
-    Untracked:  data/person_ids_and_covariates.feather
-    Untracked:  data/petition_dismissal_events.feather
-    Untracked:  data/prop_model_XG.rds
-    Untracked:  data/prop_model_XG_ARSY.rds
-    Untracked:  data/removal_episode_ends.feather
-    Untracked:  data/removal_episode_starts.feather
-    Untracked:  data/shelter_care_events.feather
-    Untracked:  data/shelter_care_events_timed.feather
-    Untracked:  data/shelter_care_events_timed.featherr
-    Untracked:  data/shelter_care_events_timed_control.feather
-    Untracked:  data/termination_cases.feather
+    Ignored:    cost_briefing_cache/
+    Ignored:    data/aoc/CCRD codebook.xlsx
+    Ignored:    data/aoc/ccrd.csv
+    Ignored:    data/aoc/ccrd.sas7bdat
+    Ignored:    data/aoc/ccrd.sav
+    Ignored:    data/aoc/dep_case.sas7bdat
+    Ignored:    data/aoc/dep_case.sav
+    Ignored:    data/aoc/dep_case_docket.sas7bdat
+    Ignored:    data/aoc/dep_case_docket.sav
+    Ignored:    data/aoc/dep_case_participant.sas7bdat
+    Ignored:    data/aoc/dep_case_participant.sav
+    Ignored:    data/aoc/famlink.sas7bdat
+    Ignored:    data/ospi/Absence_2013-19.txt
+    Ignored:    data/ospi/Absence_2013-19.txt.zip
+    Ignored:    data/ospi/Discipline_2014-19.txt
+    Ignored:    data/ospi/Discipline_2014-19.txt.zip
+    Ignored:    data/ospi/DistrictLevelPrograms_2010-19.txt
+    Ignored:    data/ospi/DistrictLevelPrograms_2010-19.txt.zip
+    Ignored:    data/ospi/EnrollDemographic_2010-19.txt
+    Ignored:    data/ospi/EnrollDemographic_2010-19.txt.zip
+    Ignored:    data/ospi/FreeReducedLunch_2010-19.txt
+    Ignored:    data/ospi/FreeReducedLunch_2010-19.txt.zip
+    Ignored:    data/ospi/SGPBase_2012-19.txt
+    Ignored:    data/ospi/SGPBase_2012-19.txt.zip
+    Ignored:    data/ospi/SGPCEDARS_2012-19.txt
+    Ignored:    data/ospi/SGPCEDARS_2012-19.txt.zip
+    Ignored:    data/ospi/SchoolLevelPrograms_2010-19.txt
+    Ignored:    data/ospi/SchoolLevelPrograms_2010-19.txt.zip
+    Ignored:    data/ospi/SpecialEducation_2010-19.txt
+    Ignored:    data/ospi/SpecialEducation_2010-19.txt.zip
+    Ignored:    data/ospi/WaKIDSBase_2012-19.txt
+    Ignored:    data/ospi/WaKIDSBase_2012-19.txt.zip
+    Ignored:    data/ospi/WaKIDSCEDARS_2012-19.txt
+    Ignored:    data/ospi/WaKIDSCEDARS_2012-19.txt.zip
+    Ignored:    data/ospi/WaKIDSSubscores_2012-19.txt
+    Ignored:    data/ospi/WaKIDSSubscores_2012-19.txt.zip
 
 Unstaged changes:
-    Modified:   .gitignore
-    Modified:   analysis/_site.yml
-    Deleted:    analysis/about.Rmd
-    Modified:   analysis/index.Rmd
-    Modified:   analysis/license.Rmd
+    Modified:   data/propensity_dat.feather
 
 </code></pre>
 <p>
@@ -584,9 +578,69 @@ Note that any generated files, e.g. HTML, png, CSS, etc., are not included in t
 <hr>
 </div>
 <div id="versions" class="tab-pane fade">
+
 <p>
-There are no past versions. Publish this analysis with <code>wflow_publish()</code> to start tracking its development.
+These are the previous versions of the repository in which changes were made to the R Markdown (<code>analysis/data_wrangling.Rmd</code>) and HTML (<code>docs/data_wrangling.html</code>) files. If you’ve configured a remote Git repository (see <code>?wflow_git_remote</code>), click on the hyperlinks in the table below to view the files as they were in that past version.
 </p>
+<div class="table-responsive">
+<table class="table table-condensed table-hover">
+<thead>
+<tr>
+<th>
+File
+</th>
+<th>
+Version
+</th>
+<th>
+Author
+</th>
+<th>
+Date
+</th>
+<th>
+Message
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Rmd
+</td>
+<td>
+ae01899
+</td>
+<td>
+joemienko
+</td>
+<td>
+2021-05-13
+</td>
+<td>
+initial commmit
+</td>
+</tr>
+<tr>
+<td>
+html
+</td>
+<td>
+ae01899
+</td>
+<td>
+joemienko
+</td>
+<td>
+2021-05-13
+</td>
+<td>
+initial commmit
+</td>
+</tr>
+</tbody>
+</table>
+</div>
 <hr>
 </div>
 </div>
@@ -1232,27 +1286,32 @@ attached base packages:
 [1] stats     graphics  grDevices utils     datasets  methods   base     
 
 other attached packages:
-[1] forcats_0.5.0   stringr_1.4.0   dplyr_1.0.3     purrr_0.3.4    
-[5] readr_1.4.0     tidyr_1.1.2     tibble_3.0.5    ggplot2_3.3.0  
-[9] tidyverse_1.3.0
+ [1] forcats_0.5.0   stringr_1.4.0   dplyr_1.0.3     purrr_0.3.4    
+ [5] readr_1.4.0     tidyr_1.1.2     tibble_3.0.5    ggplot2_3.3.0  
+ [9] tidyverse_1.3.0 workflowr_1.6.2
 
 loaded via a namespace (and not attached):
- [1] Rcpp_1.0.6        lubridate_1.7.8   lattice_0.20-41   assertthat_0.2.1 
- [5] rprojroot_2.0.2   digest_0.6.27     R6_2.5.0          cellranger_1.1.0 
- [9] odbc_1.3.0        backports_1.2.1   reprex_0.3.0      evaluate_0.14    
-[13] httr_1.4.2        pillar_1.4.7      rlang_0.4.10      readxl_1.3.1     
-[17] rstudioapi_0.11   blob_1.2.1        rmarkdown_2.6.6   feather_0.3.5    
-[21] bit_1.1-15.2      munsell_0.5.0     broom_0.5.6       compiler_4.0.2   
-[25] httpuv_1.5.4      modelr_0.1.7      xfun_0.20         pkgconfig_2.0.3  
-[29] htmltools_0.5.1.1 tidyselect_1.1.0  workflowr_1.6.2   fansi_0.4.2      
-[33] crayon_1.3.4      dbplyr_2.0.0.9000 withr_2.4.1       later_1.1.0.1    
-[37] dotenv_1.0.2      grid_4.0.2        nlme_3.1-148      jsonlite_1.7.2   
-[41] gtable_0.3.0      lifecycle_0.2.0   DBI_1.1.0         git2r_0.27.1     
-[45] magrittr_2.0.1    scales_1.1.1      cli_2.2.0         stringi_1.5.3    
-[49] fs_1.4.1          promises_1.1.1    xml2_1.3.2        ellipsis_0.3.1   
-[53] generics_0.1.0    vctrs_0.3.6       tools_4.0.2       bit64_0.9-7      
-[57] glue_1.4.2        hms_1.0.0         yaml_2.2.1        colorspace_2.0-0 
-[61] rvest_0.3.5       knitr_1.31        haven_2.3.1      </code></pre>
+ [1] dotenv_1.0.2        tidyselect_1.1.0    xfun_0.20          
+ [4] haven_2.3.1         colorspace_2.0-0    vctrs_0.3.6        
+ [7] generics_0.1.0      htmltools_0.5.1.1   yaml_2.2.1         
+[10] blob_1.2.1          rlang_0.4.10        later_1.1.0.1      
+[13] pillar_1.4.7        withr_2.4.1         glue_1.4.2         
+[16] DBI_1.1.0           bit64_0.9-7         dbplyr_2.0.0.9000  
+[19] modelr_0.1.7        readxl_1.3.1        lifecycle_1.0.0    
+[22] munsell_0.5.0       gtable_0.3.0        cellranger_1.1.0   
+[25] rvest_1.0.0         evaluate_0.14       knitr_1.31         
+[28] httpuv_1.5.4        fansi_0.4.2         broom_0.7.5        
+[31] Rcpp_1.0.6          promises_1.2.0.9000 backports_1.2.1    
+[34] scales_1.1.1        feather_0.3.5       jsonlite_1.7.2     
+[37] bit_1.1-15.2        fs_1.4.1            hms_1.0.0          
+[40] digest_0.6.27       stringi_1.5.3       rprojroot_2.0.2    
+[43] grid_4.0.2          odbc_1.3.0          cli_2.2.0          
+[46] tools_4.0.2         magrittr_2.0.1      crayon_1.3.4       
+[49] whisker_0.4         pkgconfig_2.0.3     ellipsis_0.3.1     
+[52] xml2_1.3.2          reprex_0.3.0        lubridate_1.7.8    
+[55] rstudioapi_0.11     assertthat_0.2.1    rmarkdown_2.6.6    
+[58] httr_1.4.2          R6_2.5.0            git2r_0.27.1       
+[61] compiler_4.0.2     </code></pre>
 </div>
 </div>
 </div>
